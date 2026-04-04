@@ -129,9 +129,16 @@ public class DungeonManager {
         if (config.recruitmentDurationSeconds > 0) {
             instance.startRecruitment();
             broadcastClickableJoin(config, initiator.getName().getString(), config.recruitmentDurationSeconds);
-            initiator.sendSystemMessage(Component.literal(
-                    "[Arcadia] Recrutement ouvert! Vos amis ont " + config.recruitmentDurationSeconds + "s pour rejoindre."
-            ).withStyle(ChatFormatting.GREEN));
+            MutableComponent recruitMsg = Component.literal("[Arcadia] Recrutement ouvert! Vos amis ont " + config.recruitmentDurationSeconds + "s pour rejoindre. ")
+                    .withStyle(ChatFormatting.GREEN);
+            MutableComponent leaveBtn2 = Component.literal("[QUITTER]").withStyle(style -> style
+                    .withColor(ChatFormatting.RED)
+                    .withBold(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/arcadia_dungeon abandon"))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            Component.literal("Cliquez pour quitter le donjon").withStyle(ChatFormatting.GRAY)))
+            );
+            initiator.sendSystemMessage(recruitMsg.append(leaveBtn2));
         } else {
             instance.startDungeon();
             if (config.announceStart) {
@@ -197,7 +204,15 @@ public class DungeonManager {
         playerToDungeon.put(player.getUUID(), dungeonId);
         teleportToSpawn(player, config.spawnPoint);
 
-        player.sendSystemMessage(Component.literal("[Arcadia] Vous avez rejoint " + config.name + "!").withStyle(ChatFormatting.GREEN));
+        MutableComponent joinMsg = Component.literal("[Arcadia] Vous avez rejoint " + config.name + "! ").withStyle(ChatFormatting.GREEN);
+        MutableComponent leaveBtn = Component.literal("[QUITTER]").withStyle(style -> style
+                .withColor(ChatFormatting.RED)
+                .withBold(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/arcadia_dungeon abandon"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("Cliquez pour quitter le donjon").withStyle(ChatFormatting.GRAY)))
+        );
+        player.sendSystemMessage(joinMsg.append(leaveBtn));
 
         // Notify other players in dungeon
         for (UUID otherId : instance.getPlayers()) {
