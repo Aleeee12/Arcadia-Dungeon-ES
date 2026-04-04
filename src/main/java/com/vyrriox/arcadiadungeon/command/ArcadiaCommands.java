@@ -45,6 +45,17 @@ public class ArcadiaCommands {
         return builder.buildFuture();
     };
 
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_OPTIONAL_BOSS_IDS = (ctx, builder) -> {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
+        if (config != null) {
+            return SharedSuggestionProvider.suggest(
+                    config.bosses.stream().filter(b -> b.optional).map(b -> b.id), builder
+            );
+        }
+        return builder.buildFuture();
+    };
+
     private static final SuggestionProvider<CommandSourceStack> SUGGEST_BOSS_BAR_COLORS = (ctx, builder) ->
             SharedSuggestionProvider.suggest(
                     new String[]{"RED", "BLUE", "GREEN", "YELLOW", "PURPLE", "WHITE", "PINK"}, builder
@@ -391,9 +402,31 @@ public class ArcadiaCommands {
                                 .then(Commands.argument("dungeon", StringArgumentType.word())
                                         .suggests(SUGGEST_DUNGEONS)
                                         .then(Commands.argument("bossId", StringArgumentType.word())
-                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .suggests(SUGGEST_OPTIONAL_BOSS_IDS)
                                                 .then(Commands.argument("chance", DoubleArgumentType.doubleArg(0, 1))
                                                         .executes(ArcadiaCommands::setBossSpawnChance)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("spawnatstart")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                        .executes(ArcadiaCommands::setBossSpawnAtStart)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("requiredkill")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                        .executes(ArcadiaCommands::setBossRequiredKill)
                                                 )
                                         )
                                 )
@@ -1535,6 +1568,36 @@ public class ArcadiaCommands {
         boss.optional = enabled;
         ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
         ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " optionnel: " + (enabled ? "Oui" : "Non"))
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossSpawnAtStart(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.spawnAtStart = enabled;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " spawn au debut: " + (enabled ? "Oui" : "Non"))
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossRequiredKill(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.requiredKill = enabled;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " kill obligatoire: " + (enabled ? "Oui" : "Non"))
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }

@@ -282,9 +282,14 @@ public class DungeonEventHandler {
                         ServerPlayer player = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(playerId);
                         if (player != null) player.sendSystemMessage(Component.literal("[Arcadia] Prochain boss en approche...").withStyle(ChatFormatting.YELLOW));
                     }
-                } else if (instance.getActiveBosses().isEmpty() && !instance.isWaitingForInterWaveBoss()) {
-                    // All bosses defeated and not waiting for inter-wave — complete
+                } else if (instance.allRequiredBossesDefeated() && !instance.isWaitingForInterWaveBoss()) {
+                    // All required bosses defeated — check if waves done too
                     if (!instance.hasWaves() || instance.areWavesCompleted()) {
+                        // Cleanup non-required bosses still alive
+                        for (BossInstance remaining : new ArrayList<>(instance.getActiveBosses().values())) {
+                            remaining.cleanup();
+                        }
+                        instance.getActiveBosses().clear();
                         DungeonManager.getInstance().completeDungeon(dungeonId);
                     }
                 }
@@ -440,12 +445,27 @@ public class DungeonEventHandler {
     private void onWavesCompleted(DungeonInstance instance) {
         MinecraftServer server = DungeonManager.getInstance().getServer();
         if (server == null) return;
-        for (UUID playerId : instance.getPlayers()) {
-            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Toutes les vagues eliminees! Le boss approche...").withStyle(ChatFormatting.GOLD));
+
+        // Try to spawn remaining end-of-waves bosses
+        boolean bossSpawned = false;
+        if (instance.hasNextBoss()) {
+            bossSpawned = BossManager.getInstance().spawnNextBoss(instance);
         }
-        if (instance.hasNextBoss()) BossManager.getInstance().spawnNextBoss(instance);
-        else DungeonManager.getInstance().completeDungeon(instance.getConfig().id);
+
+        if (bossSpawned) {
+            for (UUID playerId : instance.getPlayers()) {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Toutes les vagues eliminees! Le boss approche...").withStyle(ChatFormatting.GOLD));
+            }
+        } else if (instance.allRequiredBossesDefeated()) {
+            // No more bosses to spawn and all required are dead — complete
+            for (BossInstance remaining : new ArrayList<>(instance.getActiveBosses().values())) {
+                remaining.cleanup();
+            }
+            instance.getActiveBosses().clear();
+            DungeonManager.getInstance().completeDungeon(instance.getConfig().id);
+        }
+        // else: required spawnAtStart bosses still alive — wait for them to die
     }
 
     // === CONTAINMENT ===

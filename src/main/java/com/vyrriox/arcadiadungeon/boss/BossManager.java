@@ -39,6 +39,12 @@ public class BossManager {
                 continue;
             }
 
+            // Skip bosses that spawn at dungeon start (already spawned)
+            if (bossConfig.spawnAtStart) {
+                instance.incrementBossIndex();
+                continue;
+            }
+
             // Optional boss: roll for spawn chance
             if (bossConfig.optional && bossConfig.spawnChance < 1.0) {
                 double roll = server.overworld().getRandom().nextDouble();

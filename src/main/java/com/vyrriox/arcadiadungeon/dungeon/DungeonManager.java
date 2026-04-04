@@ -2,11 +2,13 @@ package com.vyrriox.arcadiadungeon.dungeon;
 
 import com.vyrriox.arcadiadungeon.ArcadiaDungeon;
 import com.vyrriox.arcadiadungeon.boss.BossInstance;
+import com.vyrriox.arcadiadungeon.config.BossConfig;
 import com.vyrriox.arcadiadungeon.config.ConfigManager;
 import com.vyrriox.arcadiadungeon.config.DungeonConfig;
 import com.vyrriox.arcadiadungeon.config.SpawnPointConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.Level;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -237,6 +239,25 @@ public class DungeonManager {
 
         // Start the actual dungeon
         instance.startDungeon();
+
+        // Spawn bosses configured to appear at dungeon start
+        for (BossConfig bossConfig : config.bosses) {
+            if (!bossConfig.spawnAtStart) continue;
+            if (bossConfig.optional && bossConfig.spawnChance < 1.0) {
+                double roll = server.overworld().getRandom().nextDouble();
+                if (roll > bossConfig.spawnChance) continue;
+            }
+            ResourceLocation dimLoc = ResourceLocation.tryParse(bossConfig.spawnPoint.dimension);
+            if (dimLoc == null) continue;
+            ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
+            ServerLevel level = server.getLevel(dimKey);
+            if (level == null) continue;
+            BossInstance bossInstance = new BossInstance(bossConfig, level, instance.getPlayerCount());
+            if (bossInstance.spawn()) {
+                instance.addBossInstance(bossConfig.id, bossInstance);
+                instance.setState(DungeonState.ACTIVE);
+            }
+        }
 
         for (UUID playerId : instance.getPlayers()) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);

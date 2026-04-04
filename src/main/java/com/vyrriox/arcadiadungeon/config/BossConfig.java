@@ -22,6 +22,8 @@ public class BossConfig {
     public boolean optional = false;
     public double spawnChance = 1.0;
     public int spawnAfterWave = 0; // 0 = spawn after all waves (default), N = spawn after wave N
+    public boolean spawnAtStart = false; // true = spawn when dungeon starts (alongside waves)
+    public boolean requiredKill = true; // true = must be killed to complete dungeon
 
     // Boss equipment
     public String mainHand = "";

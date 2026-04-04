@@ -137,6 +137,22 @@ public class DungeonInstance {
         return currentBossIndex < config.bosses.size();
     }
 
+    /**
+     * Check if all requiredKill bosses are dead.
+     * Non-required bosses still alive don't block completion.
+     */
+    public boolean allRequiredBossesDefeated() {
+        for (Map.Entry<String, BossInstance> entry : activeBosses.entrySet()) {
+            // Find the config for this active boss
+            for (var bossConfig : config.bosses) {
+                if (bossConfig.id.equals(entry.getKey()) && bossConfig.requiredKill) {
+                    return false; // A required boss is still alive
+                }
+            }
+        }
+        return true;
+    }
+
     // === WAVES ===
 
     public List<WaveInstance> getWaveInstances() {
