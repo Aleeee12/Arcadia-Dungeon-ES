@@ -558,11 +558,15 @@ public class DungeonManager {
             String dungeonId = entry.getKey();
             if (availabilityAnnounced.contains(dungeonId)) continue;
 
+            // Don't announce if this dungeon is currently active
+            if (activeInstances.containsKey(dungeonId)) continue;
+
             DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
             if (config == null || !config.announceAvailability || config.availableEverySeconds <= 0) continue;
 
             long elapsed = (System.currentTimeMillis() - entry.getValue()) / 1000;
-            if (elapsed >= config.availableEverySeconds) {
+            // Minimum 10s delay before announcing to avoid spam right after fail/complete
+            if (elapsed >= config.availableEverySeconds && elapsed >= 10) {
                 availabilityAnnounced.add(dungeonId);
                 String msg = config.availabilityMessage
                         .replace("%dungeon%", config.name)
@@ -578,6 +582,8 @@ public class DungeonManager {
                         );
                 Component full = text.append(button);
                 for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    // Don't send to players already in a dungeon
+                    if (getPlayerDungeon(player.getUUID()) != null) continue;
                     player.sendSystemMessage(full);
                 }
             }
