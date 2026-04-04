@@ -21,6 +21,8 @@ public class BossConfig {
     public String bossBarColor = "RED";
     public boolean optional = false;
     public double spawnChance = 1.0;
+    public String spawnMessage = ""; // message when boss spawns (empty = default)
+    public String skipMessage = ""; // message when optional boss doesn't spawn (empty = default)
     public int spawnAfterWave = 0; // 0 = spawn after all waves (default), N = spawn after wave N
     public boolean spawnAtStart = false; // true = spawn when dungeon starts (alongside waves)
     public boolean requiredKill = true; // true = must be killed to complete dungeon

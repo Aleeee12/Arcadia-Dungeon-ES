@@ -53,14 +53,14 @@ public class BossManager {
                             bossConfig.id, String.format("%.2f", roll), bossConfig.spawnChance);
                     instance.incrementBossIndex();
 
-                    // Notify players
+                    // Notify players with custom or default skip message
+                    String skipMsg = (bossConfig.skipMessage != null && !bossConfig.skipMessage.isEmpty())
+                            ? bossConfig.skipMessage.replace("%boss%", bossConfig.customName)
+                            : "[Arcadia] Le " + bossConfig.customName + " n'est pas apparu cette fois...";
+                    net.minecraft.network.chat.Component skipComponent = DungeonManager.parseColorCodes(skipMsg);
                     for (UUID playerId : instance.getPlayers()) {
                         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                        if (player != null) {
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                                    "[Arcadia] Le " + bossConfig.customName + " n'est pas apparu cette fois...")
-                                    .withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
-                        }
+                        if (player != null) player.sendSystemMessage(skipComponent);
                     }
                     continue;
                 }
@@ -95,6 +95,17 @@ public class BossManager {
 
             instance.addBossInstance(bossConfig.id, bossInstance);
             instance.incrementBossIndex();
+
+            // Notify players with custom or default spawn message
+            if (bossConfig.spawnMessage != null && !bossConfig.spawnMessage.isEmpty()) {
+                String spawnMsg = bossConfig.spawnMessage.replace("%boss%", bossConfig.customName);
+                net.minecraft.network.chat.Component spawnComponent = DungeonManager.parseColorCodes(spawnMsg);
+                for (UUID playerId : instance.getPlayers()) {
+                    ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                    if (player != null) player.sendSystemMessage(spawnComponent);
+                }
+            }
+
             return true;
         }
 
@@ -148,13 +159,13 @@ public class BossManager {
                 if (roll > bossConfig.spawnChance) {
                     ArcadiaDungeon.LOGGER.info("Optional inter-wave boss {} skipped (roll: {}, chance: {})",
                             bossConfig.id, String.format("%.2f", roll), bossConfig.spawnChance);
+                    String skipMsg = (bossConfig.skipMessage != null && !bossConfig.skipMessage.isEmpty())
+                            ? bossConfig.skipMessage.replace("%boss%", bossConfig.customName)
+                            : "[Arcadia] Le " + bossConfig.customName + " n'est pas apparu cette fois...";
+                    net.minecraft.network.chat.Component skipComponent = DungeonManager.parseColorCodes(skipMsg);
                     for (UUID playerId : instance.getPlayers()) {
                         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                        if (player != null) {
-                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                                    "[Arcadia] Le " + bossConfig.customName + " n'est pas apparu cette fois...")
-                                    .withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
-                        }
+                        if (player != null) player.sendSystemMessage(skipComponent);
                     }
                     continue;
                 }
@@ -175,6 +186,16 @@ public class BossManager {
 
             instance.addBossInstance(bossConfig.id, bossInstance);
             spawned = true;
+
+            // Notify players with custom or default spawn message
+            if (bossConfig.spawnMessage != null && !bossConfig.spawnMessage.isEmpty()) {
+                String spawnMsg = bossConfig.spawnMessage.replace("%boss%", bossConfig.customName);
+                net.minecraft.network.chat.Component spawnComponent = DungeonManager.parseColorCodes(spawnMsg);
+                for (UUID playerId : instance.getPlayers()) {
+                    ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                    if (player != null) player.sendSystemMessage(spawnComponent);
+                }
+            }
         }
         return spawned;
     }

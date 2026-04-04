@@ -409,6 +409,28 @@ public class ArcadiaCommands {
                                         )
                                 )
                         )
+                        .then(Commands.literal("spawnmessage")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                        .executes(ArcadiaCommands::setBossSpawnMessage)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("skipmessage")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_OPTIONAL_BOSS_IDS)
+                                                .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                        .executes(ArcadiaCommands::setBossSkipMessage)
+                                                )
+                                        )
+                                )
+                        )
                         .then(Commands.literal("spawnatstart")
                                 .then(Commands.argument("dungeon", StringArgumentType.word())
                                         .suggests(SUGGEST_DUNGEONS)
@@ -1598,6 +1620,36 @@ public class ArcadiaCommands {
         boss.requiredKill = enabled;
         ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
         ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " kill obligatoire: " + (enabled ? "Oui" : "Non"))
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossSpawnMessage(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        String msg = StringArgumentType.getString(ctx, "msg");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.spawnMessage = msg;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : message de spawn mis a jour")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossSkipMessage(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        String msg = StringArgumentType.getString(ctx, "msg");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.skipMessage = msg;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : message de skip mis a jour")
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
