@@ -501,13 +501,29 @@ public class DungeonEventHandler {
         for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
             var config = instance.getConfig();
             if (!config.hasArea() || instance.getState() == DungeonState.RECRUITING) continue;
+
+            // Contain dungeon players inside the area
             for (UUID playerId : new ArrayList<>(instance.getPlayers())) {
                 ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                // Fix #13: skip null, dead, or spectator players
                 if (player == null || !player.isAlive() || player.isSpectator()) continue;
                 if (!config.isInArea(player.level().dimension().location().toString(), player.getX(), player.getY(), player.getZ())) {
                     DungeonManager.getInstance().teleportToSpawn(player, config.spawnPoint);
                     player.sendSystemMessage(Component.literal("[Arcadia] Vous ne pouvez pas quitter la zone du donjon!").withStyle(ChatFormatting.RED));
+                }
+            }
+
+            // Kick non-participants who enter the dungeon area (e.g. /back after leaving)
+            Set<UUID> dungeonPlayers = instance.getPlayers();
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                if (dungeonPlayers.contains(player.getUUID())) continue;
+                if (player.isSpectator()) continue;
+                String dim = player.level().dimension().location().toString();
+                if (config.isInArea(dim, player.getX(), player.getY(), player.getZ())) {
+                    net.minecraft.server.level.ServerLevel overworld = server.overworld();
+                    net.minecraft.core.BlockPos spawnPos = overworld.getSharedSpawnPos();
+                    player.teleportTo(overworld, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, 0, 0);
+                    player.sendSystemMessage(Component.literal("[Arcadia] Un donjon est en cours dans cette zone! Vous avez ete teleporte au spawn.")
+                            .withStyle(ChatFormatting.RED));
                 }
             }
         }
