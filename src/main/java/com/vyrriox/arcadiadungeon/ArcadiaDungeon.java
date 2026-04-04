@@ -1,0 +1,52 @@
+package com.vyrriox.arcadiadungeon;
+
+import com.mojang.logging.LogUtils;
+import com.vyrriox.arcadiadungeon.command.ArcadiaCommands;
+import com.vyrriox.arcadiadungeon.config.ConfigManager;
+import com.vyrriox.arcadiadungeon.dungeon.DungeonManager;
+import com.vyrriox.arcadiadungeon.event.DungeonEventHandler;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import org.slf4j.Logger;
+
+@Mod(ArcadiaDungeon.MODID)
+public class ArcadiaDungeon {
+    public static final String MODID = "arcadia_dungeon";
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public ArcadiaDungeon(IEventBus modEventBus) {
+        modEventBus.addListener(this::onCommonSetup);
+        NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(new DungeonEventHandler());
+    }
+
+    private void onCommonSetup(final FMLCommonSetupEvent event) {
+        LOGGER.info("Arcadia Dungeon initializing...");
+    }
+
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        ConfigManager.getInstance().loadAll();
+        DungeonManager.getInstance().setServer(event.getServer());
+        com.vyrriox.arcadiadungeon.dungeon.WeeklyLeaderboard.getInstance().load();
+        LOGGER.info("Arcadia Dungeon loaded {} dungeon(s)", ConfigManager.getInstance().getDungeonConfigs().size());
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        DungeonManager.getInstance().stopAllDungeons();
+        com.vyrriox.arcadiadungeon.dungeon.PlayerProgressManager.getInstance().flushDirty();
+        DungeonManager.getInstance().setServer(null);
+    }
+
+    @SubscribeEvent
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        ArcadiaCommands.register(event.getDispatcher());
+    }
+}
