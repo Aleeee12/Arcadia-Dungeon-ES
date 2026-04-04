@@ -277,10 +277,20 @@ public class DungeonEventHandler {
                         // All inter-wave bosses dead — checkWaveStates will resume waves next tick
                     }
                 } else if (instance.hasNextBoss()) {
-                    BossManager.getInstance().spawnNextBoss(instance);
-                    for (UUID playerId : instance.getPlayers()) {
-                        ServerPlayer player = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(playerId);
-                        if (player != null) player.sendSystemMessage(Component.literal("[Arcadia] Prochain boss en approche...").withStyle(ChatFormatting.YELLOW));
+                    boolean spawned = BossManager.getInstance().spawnNextBoss(instance);
+                    if (spawned) {
+                        for (UUID playerId : instance.getPlayers()) {
+                            ServerPlayer player = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(playerId);
+                            if (player != null) player.sendSystemMessage(Component.literal("[Arcadia] Prochain boss en approche...").withStyle(ChatFormatting.YELLOW));
+                        }
+                    } else if (instance.allRequiredBossesDefeated()) {
+                        if (!instance.hasWaves() || instance.areWavesCompleted()) {
+                            for (BossInstance remaining : new ArrayList<>(instance.getActiveBosses().values())) {
+                                remaining.cleanup();
+                            }
+                            instance.getActiveBosses().clear();
+                            DungeonManager.getInstance().completeDungeon(dungeonId);
+                        }
                     }
                 } else if (instance.allRequiredBossesDefeated() && !instance.isWaitingForInterWaveBoss()) {
                     // All required bosses defeated — check if waves done too
