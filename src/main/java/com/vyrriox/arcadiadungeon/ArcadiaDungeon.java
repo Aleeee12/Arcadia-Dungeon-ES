@@ -33,7 +33,7 @@ public class ArcadiaDungeon {
 
     public ArcadiaDungeon(IEventBus modEventBus) {
         modEventBus.addListener(this::onCommonSetup);
-        modEventBus.addListener(this::onPermissionGather);
+        NeoForge.EVENT_BUS.addListener(this::onPermissionGather);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new DungeonEventHandler());
     }
