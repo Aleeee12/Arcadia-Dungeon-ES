@@ -171,6 +171,16 @@ public class ArcadiaCommands {
                                                 .executes(ctx -> setAnnounce(ctx, "completion"))
                                         )
                                 )
+                                .then(Commands.literal("availability")
+                                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                .executes(ctx -> setAnnounce(ctx, "availability"))
+                                        )
+                                )
+                                .then(Commands.literal("availabilitymessage")
+                                        .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                .executes(ArcadiaCommands::setAvailabilityMessage)
+                                        )
+                                )
                         )
                 )
 
@@ -211,6 +221,16 @@ public class ArcadiaCommands {
                                 .then(Commands.literal("teleportback")
                                         .then(Commands.argument("value", BoolArgumentType.bool())
                                                 .executes(ctx -> setSetting(ctx, "teleportback"))
+                                        )
+                                )
+                                .then(Commands.literal("wavehealthmultiplier")
+                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0))
+                                                .executes(ctx -> setSettingDouble(ctx, "wavehealthmultiplier"))
+                                        )
+                                )
+                                .then(Commands.literal("wavedamagemultiplier")
+                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0))
+                                                .executes(ctx -> setSettingDouble(ctx, "wavedamagemultiplier"))
                                         )
                                 )
                         )
@@ -284,6 +304,17 @@ public class ArcadiaCommands {
                                                 .then(Commands.argument("color", StringArgumentType.word())
                                                         .suggests(SUGGEST_BOSS_BAR_COLORS)
                                                         .executes(ArcadiaCommands::setBossBar)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("spawnafterwave")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("waveNum", IntegerArgumentType.integer(0))
+                                                        .executes(ArcadiaCommands::setBossSpawnAfterWave)
                                                 )
                                         )
                                 )
@@ -1100,11 +1131,28 @@ public class ArcadiaCommands {
         }
         if ("start".equals(type)) {
             config.announceStart = enabled;
+        } else if ("availability".equals(type)) {
+            config.announceAvailability = enabled;
         } else {
             config.announceCompletion = enabled;
         }
         ConfigManager.getInstance().saveDungeon(config);
         ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Annonce " + type + " " + (enabled ? "activee" : "desactivee") + ".")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setAvailabilityMessage(CommandContext<CommandSourceStack> ctx) {
+        String id = StringArgumentType.getString(ctx, "dungeon");
+        String msg = StringArgumentType.getString(ctx, "msg");
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(id);
+        if (config == null) {
+            ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + id));
+            return 0;
+        }
+        config.availabilityMessage = msg;
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Message de disponibilite mis a jour.")
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
@@ -1129,6 +1177,26 @@ public class ArcadiaCommands {
 
         ConfigManager.getInstance().saveDungeon(config);
         ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Parametre " + setting + " mis a jour.")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setSettingDouble(CommandContext<CommandSourceStack> ctx, String setting) {
+        String id = StringArgumentType.getString(ctx, "dungeon");
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(id);
+        if (config == null) {
+            ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + id));
+            return 0;
+        }
+        double value = DoubleArgumentType.getDouble(ctx, "value");
+
+        switch (setting) {
+            case "wavehealthmultiplier" -> config.settings.waveHealthMultiplierPerPlayer = value;
+            case "wavedamagemultiplier" -> config.settings.waveDamageMultiplierPerPlayer = value;
+        }
+
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Parametre " + setting + " = " + value)
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
@@ -1272,6 +1340,26 @@ public class ArcadiaCommands {
         ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
         ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Barre de boss couleur: " + color)
                 .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossSpawnAfterWave(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        int waveNum = IntegerArgumentType.getInteger(ctx, "waveNum");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.spawnAfterWave = waveNum;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        if (waveNum == 0) {
+            ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : spawn apres toutes les vagues (defaut)")
+                    .withStyle(ChatFormatting.GREEN), true);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : spawn apres la vague " + waveNum)
+                    .withStyle(ChatFormatting.GREEN), true);
+        }
         return 1;
     }
 

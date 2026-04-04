@@ -127,6 +127,9 @@ public class DungeonEventHandler {
         // Fix #18: apply freeze effects less frequently (every 100 ticks = 5s, with longer duration)
         if (tickCounter % 100 == 0) freezeRecruitingPlayers();
 
+        // Check availability announcements every 10s
+        if (tickCounter % 200 == 0) DungeonManager.getInstance().checkAvailabilityAnnouncements();
+
         // Weekly leaderboard tick every minute
         // Fix #8: flush dirty player data every 30s instead of on every completion
         if (tickCounter % 600 == 0) {
@@ -258,14 +261,22 @@ public class DungeonEventHandler {
                 instance.removeBossInstance(bossId);
                 boss.cleanup();
 
-                if (instance.hasNextBoss()) {
+                // Inter-wave boss: let checkWaveStates handle resume when all inter-wave bosses dead
+                if (instance.isWaitingForInterWaveBoss()) {
+                    if (instance.getActiveBosses().isEmpty()) {
+                        // All inter-wave bosses dead — checkWaveStates will resume waves next tick
+                    }
+                } else if (instance.hasNextBoss()) {
                     BossManager.getInstance().spawnNextBoss(instance);
                     for (UUID playerId : instance.getPlayers()) {
                         ServerPlayer player = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(playerId);
                         if (player != null) player.sendSystemMessage(Component.literal("[Arcadia] Prochain boss en approche...").withStyle(ChatFormatting.YELLOW));
                     }
-                } else if (instance.allBossesDefeated()) {
-                    DungeonManager.getInstance().completeDungeon(dungeonId);
+                } else if (instance.getActiveBosses().isEmpty() && !instance.isWaitingForInterWaveBoss()) {
+                    // All bosses defeated and not waiting for inter-wave — complete
+                    if (!instance.hasWaves() || instance.areWavesCompleted()) {
+                        DungeonManager.getInstance().completeDungeon(dungeonId);
+                    }
                 }
                 return;
             }
@@ -357,6 +368,20 @@ public class DungeonEventHandler {
 
         for (Map.Entry<String, DungeonInstance> entry : new ArrayList<>(DungeonManager.getInstance().getActiveInstances().entrySet())) {
             DungeonInstance instance = entry.getValue();
+
+            // Handle inter-wave boss fight: wait for boss to die, then resume waves
+            if (instance.isWaitingForInterWaveBoss()) {
+                if (instance.getActiveBosses().isEmpty()) {
+                    instance.setWaitingForInterWaveBoss(false);
+                    instance.setState(DungeonState.ACTIVE);
+                    // Check if there are more waves
+                    if (instance.areWavesCompleted()) {
+                        onWavesCompleted(instance);
+                    }
+                }
+                continue;
+            }
+
             if (instance.areWavesCompleted() || !instance.hasWaves() || instance.getState() != DungeonState.ACTIVE) continue;
 
             WaveInstance currentWave = instance.getCurrentWave();
@@ -364,7 +389,7 @@ public class DungeonEventHandler {
             if (!currentWave.isSpawned() && !currentWave.tickDelay()) continue;
 
             if (!currentWave.isSpawned()) {
-                currentWave.spawn(server);
+                currentWave.spawn(server, instance.getPlayerCount(), instance.getConfig().settings);
                 String msg = currentWave.getConfig().startMessage;
                 if (msg == null || msg.isEmpty()) msg = "&e[Donjon] &7Vague " + currentWave.getConfig().waveNumber + " !";
                 Component component = DungeonManager.parseColorCodes(msg);
@@ -377,11 +402,27 @@ public class DungeonEventHandler {
             currentWave.checkGlowing();
 
             if (currentWave.isCleared()) {
+                int clearedWaveNumber = currentWave.getConfig().waveNumber;
                 for (UUID playerId : instance.getPlayers()) {
                     ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                    if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Vague " + currentWave.getConfig().waveNumber + " terminee!").withStyle(ChatFormatting.GREEN));
+                    if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Vague " + clearedWaveNumber + " terminee!").withStyle(ChatFormatting.GREEN));
                 }
-                if (!instance.advanceWave()) onWavesCompleted(instance);
+
+                // Check for inter-wave boss after this wave
+                boolean bossSpawned = BossManager.getInstance().spawnBossesForWave(instance, clearedWaveNumber);
+                if (bossSpawned) {
+                    instance.setWaitingForInterWaveBoss(true);
+                    // Advance wave index now so waves resume after boss dies
+                    if (!instance.advanceWave()) {
+                        instance.setWavesCompleted(true);
+                    }
+                    for (UUID playerId : instance.getPlayers()) {
+                        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                        if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Un boss approche!").withStyle(ChatFormatting.GOLD));
+                    }
+                } else {
+                    if (!instance.advanceWave()) onWavesCompleted(instance);
+                }
             }
         }
     }

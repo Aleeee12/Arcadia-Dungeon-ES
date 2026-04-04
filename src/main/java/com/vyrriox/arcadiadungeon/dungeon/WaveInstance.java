@@ -2,6 +2,7 @@ package com.vyrriox.arcadiadungeon.dungeon;
 
 import com.vyrriox.arcadiadungeon.ArcadiaDungeon;
 import com.vyrriox.arcadiadungeon.boss.BossInstance;
+import com.vyrriox.arcadiadungeon.config.DungeonSettings;
 import com.vyrriox.arcadiadungeon.config.MobSpawnConfig;
 import com.vyrriox.arcadiadungeon.config.SpawnPointConfig;
 import com.vyrriox.arcadiadungeon.config.WaveConfig;
@@ -45,8 +46,16 @@ public class WaveInstance {
     }
 
     public boolean spawn(MinecraftServer server) {
+        return spawn(server, 1, null);
+    }
+
+    public boolean spawn(MinecraftServer server, int playerCount, DungeonSettings settings) {
         if (spawned) return false;
         spawned = true;
+
+        boolean adaptive = settings != null && settings.difficultyScaling && playerCount > 1;
+        double healthScale = adaptive ? 1.0 + (settings.waveHealthMultiplierPerPlayer * (playerCount - 1)) : 1.0;
+        double damageScale = adaptive ? 1.0 + (settings.waveDamageMultiplierPerPlayer * (playerCount - 1)) : 1.0;
 
         for (MobSpawnConfig mobConfig : config.mobs) {
             Optional<EntityType<?>> typeOpt = EntityType.byString(mobConfig.entityType);
@@ -95,15 +104,16 @@ public class WaveInstance {
                     living.setCustomNameVisible(true);
                 }
 
-                // Health
+                // Health (with adaptive scaling)
                 if (living.getAttribute(Attributes.MAX_HEALTH) != null && mobConfig.health > 0) {
-                    living.getAttribute(Attributes.MAX_HEALTH).setBaseValue(mobConfig.health);
-                    living.setHealth((float) mobConfig.health);
+                    double scaledHealth = mobConfig.health * healthScale;
+                    living.getAttribute(Attributes.MAX_HEALTH).setBaseValue(scaledHealth);
+                    living.setHealth((float) scaledHealth);
                 }
 
-                // Damage
+                // Damage (with adaptive scaling)
                 if (living.getAttribute(Attributes.ATTACK_DAMAGE) != null && mobConfig.damage > 0) {
-                    living.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(mobConfig.damage);
+                    living.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(mobConfig.damage * damageScale);
                 }
 
                 // Speed

@@ -26,6 +26,7 @@ public class DungeonInstance {
     private int currentWaveIndex = 0;
     private boolean wavesCompleted = false;
     private final Map<UUID, Integer> playerDeaths = new LinkedHashMap<>();
+    private boolean waitingForInterWaveBoss = false;
 
     public DungeonInstance(DungeonConfig config, MinecraftServer server) {
         this.config = config;
@@ -172,6 +173,16 @@ public class DungeonInstance {
 
     public boolean hasWaves() {
         return !waveInstances.isEmpty();
+    }
+
+    // === INTER-WAVE BOSS ===
+
+    public boolean isWaitingForInterWaveBoss() {
+        return waitingForInterWaveBoss;
+    }
+
+    public void setWaitingForInterWaveBoss(boolean waiting) {
+        this.waitingForInterWaveBoss = waiting;
     }
 
     // === DEATHS ===

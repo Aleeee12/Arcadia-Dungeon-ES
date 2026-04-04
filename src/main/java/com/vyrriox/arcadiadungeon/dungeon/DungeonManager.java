@@ -29,6 +29,7 @@ public class DungeonManager {
     private final Map<String, Long> playerCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, SpawnPointConfig> playerReturnPoints = new ConcurrentHashMap<>();
     private final Map<String, Long> dungeonAvailability = new ConcurrentHashMap<>();
+    private final Set<String> availabilityAnnounced = new HashSet<>();
     // Dungeons pending fail (to avoid reentrant modification)
     private final List<String> pendingFails = new ArrayList<>();
 
@@ -279,6 +280,7 @@ public class DungeonManager {
 
         if (config.availableEverySeconds > 0) {
             dungeonAvailability.put(dungeonId, System.currentTimeMillis());
+            availabilityAnnounced.remove(dungeonId);
         }
 
         if (config.announceCompletion && server != null) {
@@ -312,6 +314,11 @@ public class DungeonManager {
                 }
                 player.sendSystemMessage(Component.literal("[Arcadia] Donjon echoue!").withStyle(ChatFormatting.RED));
             }
+        }
+
+        if (config.availableEverySeconds > 0) {
+            dungeonAvailability.put(dungeonId, System.currentTimeMillis());
+            availabilityAnnounced.remove(dungeonId);
         }
 
         if (config.announceCompletion && server != null && !playerNames.isEmpty()) {
@@ -491,6 +498,38 @@ public class DungeonManager {
         ServerLevel level = server.getLevel(dimKey);
         if (level != null) {
             player.teleportTo(level, spawn.x, spawn.y, spawn.z, spawn.yaw, spawn.pitch);
+        }
+    }
+
+    public void checkAvailabilityAnnouncements() {
+        if (server == null) return;
+        for (Map.Entry<String, Long> entry : dungeonAvailability.entrySet()) {
+            String dungeonId = entry.getKey();
+            if (availabilityAnnounced.contains(dungeonId)) continue;
+
+            DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
+            if (config == null || !config.announceAvailability || config.availableEverySeconds <= 0) continue;
+
+            long elapsed = (System.currentTimeMillis() - entry.getValue()) / 1000;
+            if (elapsed >= config.availableEverySeconds) {
+                availabilityAnnounced.add(dungeonId);
+                String msg = config.availabilityMessage
+                        .replace("%dungeon%", config.name)
+                        .replace("%id%", config.id);
+                MutableComponent text = (MutableComponent) parseColorCodes(msg);
+                MutableComponent button = Component.literal(" [LANCER]")
+                        .withStyle(style -> style
+                                .withColor(ChatFormatting.GREEN)
+                                .withBold(true)
+                                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/arcadia_dungeon start " + config.id))
+                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                        Component.literal("Cliquez pour lancer " + config.name).withStyle(ChatFormatting.YELLOW)))
+                        );
+                Component full = text.append(button);
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    player.sendSystemMessage(full);
+                }
+            }
         }
     }
 

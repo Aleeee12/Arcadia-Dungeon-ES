@@ -28,10 +28,16 @@ public class BossManager {
         MinecraftServer server = DungeonManager.getInstance().getServer();
         if (server == null) return false;
 
-        // Find next boss to spawn, skipping optional bosses that fail their chance roll
+        // Find next end-of-waves boss to spawn, skipping inter-wave bosses and optional misses
         while (instance.hasNextBoss()) {
             int bossIndex = instance.getCurrentBossIndex();
             BossConfig bossConfig = instance.getConfig().bosses.get(bossIndex);
+
+            // Skip inter-wave bosses (handled by spawnBossesForWave)
+            if (bossConfig.spawnAfterWave > 0) {
+                instance.incrementBossIndex();
+                continue;
+            }
 
             // Optional boss: roll for spawn chance
             if (bossConfig.optional && bossConfig.spawnChance < 1.0) {
@@ -116,6 +122,55 @@ public class BossManager {
 
         ArcadiaDungeon.LOGGER.info("Boss damage adapted: avg armor={}, multiplier=x{}",
                 String.format("%.1f", avgArmor), String.format("%.2f", armorMultiplier));
+    }
+
+    /**
+     * Spawn bosses that are configured to appear after a specific wave.
+     * Returns true if at least one boss was spawned.
+     */
+    public boolean spawnBossesForWave(DungeonInstance instance, int waveNumber) {
+        MinecraftServer server = DungeonManager.getInstance().getServer();
+        if (server == null) return false;
+
+        boolean spawned = false;
+        for (BossConfig bossConfig : instance.getConfig().bosses) {
+            if (bossConfig.spawnAfterWave != waveNumber) continue;
+
+            // Optional boss: roll for spawn chance
+            if (bossConfig.optional && bossConfig.spawnChance < 1.0) {
+                double roll = server.overworld().getRandom().nextDouble();
+                if (roll > bossConfig.spawnChance) {
+                    ArcadiaDungeon.LOGGER.info("Optional inter-wave boss {} skipped (roll: {}, chance: {})",
+                            bossConfig.id, String.format("%.2f", roll), bossConfig.spawnChance);
+                    for (UUID playerId : instance.getPlayers()) {
+                        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                        if (player != null) {
+                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                                    "[Arcadia] Le " + bossConfig.customName + " n'est pas apparu cette fois...")
+                                    .withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            ResourceLocation dimLoc = ResourceLocation.tryParse(bossConfig.spawnPoint.dimension);
+            if (dimLoc == null) continue;
+            ResourceKey<Level> dimKey = ResourceKey.create(Registries.DIMENSION, dimLoc);
+            ServerLevel level = server.getLevel(dimKey);
+            if (level == null) continue;
+
+            BossInstance bossInstance = new BossInstance(bossConfig, level, instance.getPlayerCount());
+            if (!bossInstance.spawn()) continue;
+
+            if (instance.getConfig().settings.difficultyScaling) {
+                adaptBossDamageToArmor(bossInstance, instance, server);
+            }
+
+            instance.addBossInstance(bossConfig.id, bossInstance);
+            spawned = true;
+        }
+        return spawned;
     }
 
     public void tickAllBosses() {

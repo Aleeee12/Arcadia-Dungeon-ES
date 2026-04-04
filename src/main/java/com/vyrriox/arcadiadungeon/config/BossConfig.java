@@ -21,6 +21,7 @@ public class BossConfig {
     public String bossBarColor = "RED";
     public boolean optional = false;
     public double spawnChance = 1.0;
+    public int spawnAfterWave = 0; // 0 = spawn after all waves (default), N = spawn after wave N
 
     // Boss equipment
     public String mainHand = "";
