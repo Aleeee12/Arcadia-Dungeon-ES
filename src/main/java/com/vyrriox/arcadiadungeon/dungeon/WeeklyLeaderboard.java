@@ -113,7 +113,7 @@ public class WeeklyLeaderboard {
     }
 
     public void tick(MinecraftServer server) {
-        if (!config.enabled) return;
+        if (server == null || !config.enabled) return;
 
         LocalDateTime now = LocalDateTime.now();
         String currentWeek = getCurrentWeekId();
@@ -131,8 +131,8 @@ public class WeeklyLeaderboard {
             return;
         }
 
-        // Check for daily announcement at configured hour
-        if (!announcedThisWeek && now.getHour() == config.announceHour && now.getMinute() == 0) {
+        // Check for announcement at configured hour (range-based: within 2 minutes to avoid missing on lag)
+        if (!announcedThisWeek && now.getHour() == config.announceHour && now.getMinute() <= 2) {
             if (now.getDayOfWeek() == config.resetDay && !data.rewarded) {
                 announceAndReward(server);
                 announcedThisWeek = true;

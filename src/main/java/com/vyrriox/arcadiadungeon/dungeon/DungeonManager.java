@@ -30,6 +30,8 @@ public class DungeonManager {
     private final Map<UUID, SpawnPointConfig> playerReturnPoints = new ConcurrentHashMap<>();
     private final Map<String, Long> dungeonAvailability = new ConcurrentHashMap<>();
     private final Set<String> availabilityAnnounced = new HashSet<>();
+    // Reverse lookup: player UUID -> dungeon ID for O(1) lookups
+    private final Map<UUID, String> playerToDungeon = new ConcurrentHashMap<>();
     // Dungeons pending fail (to avoid reentrant modification)
     private final List<String> pendingFails = new ArrayList<>();
 
@@ -45,6 +47,7 @@ public class DungeonManager {
             activeInstances.clear();
             playerCooldowns.clear();
             playerReturnPoints.clear();
+            playerToDungeon.clear();
         } else {
             PlayerProgressManager.getInstance().loadAll();
         }
@@ -116,6 +119,7 @@ public class DungeonManager {
         saveReturnPoint(initiator);
         DungeonInstance instance = new DungeonInstance(config, server);
         instance.addPlayer(initiator);
+        playerToDungeon.put(initiator.getUUID(), dungeonId);
         activeInstances.put(dungeonId, instance);
         teleportToSpawn(initiator, config.spawnPoint);
 
@@ -188,6 +192,7 @@ public class DungeonManager {
 
         saveReturnPoint(player);
         instance.addPlayer(player);
+        playerToDungeon.put(player.getUUID(), dungeonId);
         teleportToSpawn(player, config.spawnPoint);
 
         player.sendSystemMessage(Component.literal("[Arcadia] Vous avez rejoint " + config.name + "!").withStyle(ChatFormatting.GREEN));
@@ -220,6 +225,7 @@ public class DungeonManager {
                     player.sendSystemMessage(Component.literal("[Arcadia] Pas assez de joueurs (" + instance.getPlayerCount()
                             + "/" + config.settings.minPlayers + "). Donjon annule.").withStyle(ChatFormatting.RED));
                 }
+                playerToDungeon.remove(playerId);
             }
             instance.cleanup();
             activeInstances.remove(dungeonId);
@@ -291,6 +297,7 @@ public class DungeonManager {
             broadcastMessage(msg);
         }
 
+        for (UUID pid : instance.getPlayers()) playerToDungeon.remove(pid);
         instance.cleanup();
         activeInstances.remove(dungeonId);
         ArcadiaDungeon.LOGGER.info("Dungeon {} completed", dungeonId);
@@ -328,6 +335,7 @@ public class DungeonManager {
             broadcastMessage(msg);
         }
 
+        for (UUID pid : instance.getPlayers()) playerToDungeon.remove(pid);
         instance.cleanup();
         activeInstances.remove(dungeonId);
     }
@@ -344,6 +352,7 @@ public class DungeonManager {
             }
         }
 
+        for (UUID pid : instance.getPlayers()) playerToDungeon.remove(pid);
         instance.cleanup();
         activeInstances.remove(dungeonId);
     }
@@ -364,6 +373,7 @@ public class DungeonManager {
                 teleportBack(player);
                 player.sendSystemMessage(Component.literal("[Arcadia] Le donjon a ete reinitialise.").withStyle(ChatFormatting.RED));
             }
+            playerToDungeon.remove(playerId);
         }
 
         instance.cleanup();
@@ -416,6 +426,7 @@ public class DungeonManager {
                 }
 
                 instance.removePlayer(playerId);
+                playerToDungeon.remove(playerId);
 
                 // Notify remaining players
                 if (!instance.getPlayers().isEmpty() && !playerName.isEmpty()) {
@@ -463,10 +474,14 @@ public class DungeonManager {
     }
 
     public DungeonInstance getPlayerDungeon(UUID playerId) {
-        for (DungeonInstance instance : activeInstances.values()) {
-            if (instance.getPlayers().contains(playerId)) {
+        String dungeonId = playerToDungeon.get(playerId);
+        if (dungeonId != null) {
+            DungeonInstance instance = activeInstances.get(dungeonId);
+            if (instance != null && instance.getPlayers().contains(playerId)) {
                 return instance;
             }
+            // Stale entry
+            playerToDungeon.remove(playerId);
         }
         return null;
     }
@@ -531,6 +546,28 @@ public class DungeonManager {
                 }
             }
         }
+    }
+
+    /**
+     * Prune expired cooldowns and availability entries to prevent memory leaks.
+     * Called periodically from tick handler.
+     */
+    public void pruneExpiredData() {
+        long now = System.currentTimeMillis();
+
+        // Prune player cooldowns older than max possible cooldown (24h safety cap)
+        playerCooldowns.entrySet().removeIf(e -> (now - e.getValue()) / 1000 > 86400);
+
+        // Prune availability entries for dungeons that no longer exist or already announced
+        dungeonAvailability.entrySet().removeIf(e -> {
+            DungeonConfig config = ConfigManager.getInstance().getDungeon(e.getKey());
+            if (config == null) return true;
+            long elapsed = (now - e.getValue()) / 1000;
+            return elapsed > config.availableEverySeconds + 3600; // 1h grace after expiry
+        });
+
+        // Prune return points for players not in any dungeon
+        playerReturnPoints.entrySet().removeIf(e -> getPlayerDungeon(e.getKey()) == null);
     }
 
     public void broadcastMessage(String message) {

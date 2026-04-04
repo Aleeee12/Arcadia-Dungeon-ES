@@ -129,8 +129,9 @@ public class PlayerProgressManager {
     }
 
     public PlayerProgress findByName(String playerName) {
+        if (playerName == null || playerName.isEmpty()) return null;
         for (PlayerProgress progress : playerData.values()) {
-            if (progress.playerName.equalsIgnoreCase(playerName)) {
+            if (progress.playerName != null && progress.playerName.equalsIgnoreCase(playerName)) {
                 return progress;
             }
         }

@@ -140,6 +140,11 @@ public class DungeonEventHandler {
             var server = DungeonManager.getInstance().getServer();
             if (server != null) WeeklyLeaderboard.getInstance().tick(server);
         }
+
+        // Prune expired data every 5 minutes to prevent memory leaks
+        if (tickCounter % 6000 == 0) {
+            DungeonManager.getInstance().pruneExpiredData();
+        }
     }
 
     // === ENTITY EVENTS ===
@@ -214,10 +219,15 @@ public class DungeonEventHandler {
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            DungeonInstance instance = DungeonManager.getInstance().getPlayerDungeon(player.getUUID());
+            UUID uuid = player.getUUID();
+            DungeonInstance instance = DungeonManager.getInstance().getPlayerDungeon(uuid);
             if (instance != null) {
-                DungeonManager.getInstance().removePlayerFromDungeon(player.getUUID());
+                DungeonManager.getInstance().removePlayerFromDungeon(uuid);
             }
+            // Cleanup wand data
+            wandDungeon.remove(uuid);
+            wandPos1.remove(uuid);
+            wandPos2.remove(uuid);
         }
     }
 

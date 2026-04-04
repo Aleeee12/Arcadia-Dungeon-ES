@@ -39,6 +39,7 @@ public class BossInstance {
     private double scaledDamage;
     private double originalBaseSpeed;
     private long lastSummonMessageTick = 0;
+    private int spawnInvulnerabilityTicks = 100; // 5 seconds of invulnerability after spawn
 
     public BossInstance(BossConfig config, ServerLevel level, int playerCount) {
         this.config = config;
@@ -113,6 +114,9 @@ public class BossInstance {
         bossEntity.addTag("arcadia_boss_" + config.id);
         bossEntity.addTag("arcadia_no_loot");
 
+        // Temporary invulnerability to prevent boss being killed before players arrive
+        bossEntity.setInvulnerable(true);
+
         level.addFreshEntity(bossEntity);
 
         if (config.showBossBar) {
@@ -137,6 +141,14 @@ public class BossInstance {
     public void tick(Collection<UUID> dungeonPlayers) {
         if (bossEntity == null || !bossEntity.isAlive()) return;
         pruneSummons(); // Fix #6: prune in tick, not in damage events
+
+        // Spawn invulnerability countdown
+        if (spawnInvulnerabilityTicks > 0) {
+            spawnInvulnerabilityTicks--;
+            if (spawnInvulnerabilityTicks <= 0 && !transitioning) {
+                bossEntity.setInvulnerable(false);
+            }
+        }
 
         // Update boss bar
         if (bossBar != null) {

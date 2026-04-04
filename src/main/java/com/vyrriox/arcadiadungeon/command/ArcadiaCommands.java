@@ -233,6 +233,63 @@ public class ArcadiaCommands {
                                                 .executes(ctx -> setSettingDouble(ctx, "wavedamagemultiplier"))
                                         )
                                 )
+                                .then(Commands.literal("difficultyscaling")
+                                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                                .executes(ctx -> setSetting(ctx, "difficultyscaling"))
+                                        )
+                                )
+                                .then(Commands.literal("antimonopole")
+                                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                                .executes(ctx -> setSetting(ctx, "antimonopole"))
+                                        )
+                                )
+                                .then(Commands.literal("antimonopolethreshold")
+                                        .then(Commands.argument("value", IntegerArgumentType.integer(1))
+                                                .executes(ctx -> setSetting(ctx, "antimonopolethreshold"))
+                                        )
+                                )
+                                .then(Commands.literal("blockteleport")
+                                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                                .executes(ctx -> setSetting(ctx, "blockteleport"))
+                                        )
+                                )
+                        )
+                )
+
+                // === MESSAGES ===
+                .then(Commands.literal("setmessage")
+                        .then(Commands.argument("dungeon", StringArgumentType.word())
+                                .suggests(SUGGEST_DUNGEONS)
+                                .then(Commands.literal("start")
+                                        .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                .executes(ctx -> setDungeonMessage(ctx, "start"))
+                                        )
+                                )
+                                .then(Commands.literal("completion")
+                                        .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                .executes(ctx -> setDungeonMessage(ctx, "completion"))
+                                        )
+                                )
+                                .then(Commands.literal("fail")
+                                        .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                .executes(ctx -> setDungeonMessage(ctx, "fail"))
+                                        )
+                                )
+                                .then(Commands.literal("recruitment")
+                                        .then(Commands.argument("msg", StringArgumentType.greedyString())
+                                                .executes(ctx -> setDungeonMessage(ctx, "recruitment"))
+                                        )
+                                )
+                        )
+                )
+
+                // === RENAME ===
+                .then(Commands.literal("rename")
+                        .then(Commands.argument("dungeon", StringArgumentType.word())
+                                .suggests(SUGGEST_DUNGEONS)
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ArcadiaCommands::renameDungeon)
+                                )
                         )
                 )
 
@@ -315,6 +372,50 @@ public class ArcadiaCommands {
                                                 .suggests(SUGGEST_BOSS_IDS)
                                                 .then(Commands.argument("waveNum", IntegerArgumentType.integer(0))
                                                         .executes(ArcadiaCommands::setBossSpawnAfterWave)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("optional")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                        .executes(ArcadiaCommands::setBossOptional)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("spawnchance")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("chance", DoubleArgumentType.doubleArg(0, 1))
+                                                        .executes(ArcadiaCommands::setBossSpawnChance)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("sethealth")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("health", DoubleArgumentType.doubleArg(1))
+                                                        .executes(ArcadiaCommands::setBossHealth)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("setdamage")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("bossId", StringArgumentType.word())
+                                                .suggests(SUGGEST_BOSS_IDS)
+                                                .then(Commands.argument("damage", DoubleArgumentType.doubleArg(0))
+                                                        .executes(ArcadiaCommands::setBossDamage)
                                                 )
                                         )
                                 )
@@ -849,6 +950,62 @@ public class ArcadiaCommands {
                                         )
                                 )
                         )
+                        .then(Commands.literal("delay")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("waveNum", IntegerArgumentType.integer(1))
+                                                .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
+                                                        .executes(ArcadiaCommands::setWaveDelay)
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("glowing")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("waveNum", IntegerArgumentType.integer(1))
+                                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                        .then(Commands.argument("delaySeconds", IntegerArgumentType.integer(0))
+                                                                .executes(ArcadiaCommands::setWaveGlowing)
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("setmob")
+                                .then(Commands.argument("dungeon", StringArgumentType.word())
+                                        .suggests(SUGGEST_DUNGEONS)
+                                        .then(Commands.argument("waveNum", IntegerArgumentType.integer(1))
+                                                .then(Commands.argument("mobIndex", IntegerArgumentType.integer(0))
+                                                        .then(Commands.literal("health")
+                                                                .then(Commands.argument("value", DoubleArgumentType.doubleArg(1))
+                                                                        .executes(ctx -> setWaveMobProp(ctx, "health"))
+                                                                )
+                                                        )
+                                                        .then(Commands.literal("damage")
+                                                                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0))
+                                                                        .executes(ctx -> setWaveMobProp(ctx, "damage"))
+                                                                )
+                                                        )
+                                                        .then(Commands.literal("speed")
+                                                                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0))
+                                                                        .executes(ctx -> setWaveMobProp(ctx, "speed"))
+                                                                )
+                                                        )
+                                                        .then(Commands.literal("count")
+                                                                .then(Commands.argument("value", IntegerArgumentType.integer(1))
+                                                                        .executes(ctx -> setWaveMobProp(ctx, "count"))
+                                                                )
+                                                        )
+                                                        .then(Commands.literal("name")
+                                                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                                                        .executes(ctx -> setWaveMobProp(ctx, "name"))
+                                                                )
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
                         .then(Commands.literal("message")
                                 .then(Commands.argument("dungeon", StringArgumentType.word())
                                         .suggests(SUGGEST_DUNGEONS)
@@ -1173,6 +1330,10 @@ public class ArcadiaCommands {
             case "pvp" -> config.settings.pvp = BoolArgumentType.getBool(ctx, "value");
             case "maxdeaths" -> config.settings.maxDeaths = IntegerArgumentType.getInteger(ctx, "value");
             case "teleportback" -> config.teleportBackOnComplete = BoolArgumentType.getBool(ctx, "value");
+            case "difficultyscaling" -> config.settings.difficultyScaling = BoolArgumentType.getBool(ctx, "value");
+            case "antimonopole" -> config.settings.antiMonopole = BoolArgumentType.getBool(ctx, "value");
+            case "antimonopolethreshold" -> config.settings.antiMonopoleThreshold = IntegerArgumentType.getInteger(ctx, "value");
+            case "blockteleport" -> config.settings.blockTeleportCommands = BoolArgumentType.getBool(ctx, "value");
         }
 
         ConfigManager.getInstance().saveDungeon(config);
@@ -1360,6 +1521,170 @@ public class ArcadiaCommands {
             ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : spawn apres la vague " + waveNum)
                     .withStyle(ChatFormatting.GREEN), true);
         }
+        return 1;
+    }
+
+    private static int setBossOptional(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.optional = enabled;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " optionnel: " + (enabled ? "Oui" : "Non"))
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossSpawnChance(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        double chance = DoubleArgumentType.getDouble(ctx, "chance");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.spawnChance = chance;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " chance de spawn: " + (int)(chance * 100) + "%")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossHealth(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        double health = DoubleArgumentType.getDouble(ctx, "health");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.baseHealth = health;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : vie de base = " + health)
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setBossDamage(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        String bossId = StringArgumentType.getString(ctx, "bossId");
+        double damage = DoubleArgumentType.getDouble(ctx, "damage");
+
+        BossConfig boss = findBoss(ctx, dungeonId, bossId);
+        if (boss == null) return 0;
+
+        boss.baseDamage = damage;
+        ConfigManager.getInstance().saveDungeon(ConfigManager.getInstance().getDungeon(dungeonId));
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Boss " + bossId + " : degats de base = " + damage)
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    // === DUNGEON MESSAGES ===
+
+    private static int setDungeonMessage(CommandContext<CommandSourceStack> ctx, String type) {
+        String id = StringArgumentType.getString(ctx, "dungeon");
+        String msg = StringArgumentType.getString(ctx, "msg");
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(id);
+        if (config == null) {
+            ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + id));
+            return 0;
+        }
+        switch (type) {
+            case "start" -> config.startMessage = msg;
+            case "completion" -> config.completionMessage = msg;
+            case "fail" -> config.failMessage = msg;
+            case "recruitment" -> config.recruitmentMessage = msg;
+        }
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Message " + type + " mis a jour.")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int renameDungeon(CommandContext<CommandSourceStack> ctx) {
+        String id = StringArgumentType.getString(ctx, "dungeon");
+        String name = StringArgumentType.getString(ctx, "name");
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(id);
+        if (config == null) {
+            ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + id));
+            return 0;
+        }
+        config.name = name;
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Donjon renomme: " + name)
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    // === WAVE CONFIG COMMANDS ===
+
+    private static int setWaveDelay(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        int waveNum = IntegerArgumentType.getInteger(ctx, "waveNum");
+        int seconds = IntegerArgumentType.getInteger(ctx, "seconds");
+
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
+        if (config == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + dungeonId)); return 0; }
+        WaveConfig wave = config.waves.stream().filter(w -> w.waveNumber == waveNum).findFirst().orElse(null);
+        if (wave == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Vague introuvable: " + waveNum)); return 0; }
+
+        wave.delayBeforeSeconds = seconds;
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Vague " + waveNum + " : delai = " + seconds + "s")
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setWaveGlowing(CommandContext<CommandSourceStack> ctx) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        int waveNum = IntegerArgumentType.getInteger(ctx, "waveNum");
+        boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
+        int delay = IntegerArgumentType.getInteger(ctx, "delaySeconds");
+
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
+        if (config == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + dungeonId)); return 0; }
+        WaveConfig wave = config.waves.stream().filter(w -> w.waveNumber == waveNum).findFirst().orElse(null);
+        if (wave == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Vague introuvable: " + waveNum)); return 0; }
+
+        wave.glowingAfterDelay = enabled;
+        wave.glowingDelaySeconds = delay;
+        ConfigManager.getInstance().saveDungeon(config);
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Vague " + waveNum + " : glowing " + (enabled ? "actif apres " + delay + "s" : "desactive"))
+                .withStyle(ChatFormatting.GREEN), true);
+        return 1;
+    }
+
+    private static int setWaveMobProp(CommandContext<CommandSourceStack> ctx, String prop) {
+        String dungeonId = StringArgumentType.getString(ctx, "dungeon");
+        int waveNum = IntegerArgumentType.getInteger(ctx, "waveNum");
+        int mobIndex = IntegerArgumentType.getInteger(ctx, "mobIndex");
+
+        DungeonConfig config = ConfigManager.getInstance().getDungeon(dungeonId);
+        if (config == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Donjon introuvable: " + dungeonId)); return 0; }
+        WaveConfig wave = config.waves.stream().filter(w -> w.waveNumber == waveNum).findFirst().orElse(null);
+        if (wave == null) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Vague introuvable: " + waveNum)); return 0; }
+        if (mobIndex < 0 || mobIndex >= wave.mobs.size()) { ctx.getSource().sendFailure(Component.literal("[Arcadia] Index mob invalide: " + mobIndex)); return 0; }
+
+        MobSpawnConfig mob = wave.mobs.get(mobIndex);
+        String display;
+        switch (prop) {
+            case "health" -> { mob.health = DoubleArgumentType.getDouble(ctx, "value"); display = "vie = " + mob.health; }
+            case "damage" -> { mob.damage = DoubleArgumentType.getDouble(ctx, "value"); display = "degats = " + mob.damage; }
+            case "speed" -> { mob.speed = DoubleArgumentType.getDouble(ctx, "value"); display = "vitesse = " + mob.speed; }
+            case "count" -> { mob.count = IntegerArgumentType.getInteger(ctx, "value"); display = "nombre = " + mob.count; }
+            case "name" -> { mob.customName = StringArgumentType.getString(ctx, "name"); display = "nom = " + mob.customName; }
+            default -> { return 0; }
+        }
+
+        ConfigManager.getInstance().saveDungeon(config);
+        final String d = display;
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Mob " + mobIndex + " (vague " + waveNum + ") : " + d)
+                .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 
