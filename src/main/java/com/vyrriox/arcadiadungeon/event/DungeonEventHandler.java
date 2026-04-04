@@ -274,11 +274,9 @@ public class DungeonEventHandler {
                 instance.removeBossInstance(bossId);
                 boss.cleanup();
 
-                // Inter-wave boss: let checkWaveStates handle resume when all inter-wave bosses dead
+                // Inter-wave boss: let checkWaveStates handle resume when required bosses dead
                 if (instance.isWaitingForInterWaveBoss()) {
-                    if (instance.getActiveBosses().isEmpty()) {
-                        // All inter-wave bosses dead — checkWaveStates will resume waves next tick
-                    }
+                    // checkWaveStates will detect allRequiredBossesDefeated and resume
                 } else if (instance.hasNextBoss()) {
                     boolean spawned = BossManager.getInstance().spawnNextBoss(instance);
                     if (spawned) {
@@ -397,12 +395,11 @@ public class DungeonEventHandler {
         for (Map.Entry<String, DungeonInstance> entry : new ArrayList<>(DungeonManager.getInstance().getActiveInstances().entrySet())) {
             DungeonInstance instance = entry.getValue();
 
-            // Handle inter-wave boss fight: wait for boss to die, then resume waves
+            // Handle inter-wave boss fight: wait for required inter-wave bosses to die, then resume waves
             if (instance.isWaitingForInterWaveBoss()) {
-                if (instance.getActiveBosses().isEmpty()) {
+                if (instance.allRequiredBossesDefeated()) {
                     instance.setWaitingForInterWaveBoss(false);
                     instance.setState(DungeonState.ACTIVE);
-                    // Check if there are more waves
                     if (instance.areWavesCompleted()) {
                         onWavesCompleted(instance);
                     }
@@ -410,7 +407,10 @@ public class DungeonEventHandler {
                 continue;
             }
 
-            if (instance.areWavesCompleted() || !instance.hasWaves() || instance.getState() != DungeonState.ACTIVE) continue;
+            // Allow wave processing if state is ACTIVE, or BOSS_FIGHT with only optional bosses alive
+            if (instance.areWavesCompleted() || !instance.hasWaves()) continue;
+            if (instance.getState() != DungeonState.ACTIVE && instance.getState() != DungeonState.BOSS_FIGHT) continue;
+            if (instance.getState() == DungeonState.BOSS_FIGHT && !instance.allRequiredBossesDefeated()) continue;
 
             WaveInstance currentWave = instance.getCurrentWave();
             if (currentWave == null) { instance.setWavesCompleted(true); onWavesCompleted(instance); continue; }

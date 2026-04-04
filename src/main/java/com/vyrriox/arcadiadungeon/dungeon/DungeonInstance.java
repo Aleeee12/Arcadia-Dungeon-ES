@@ -114,7 +114,11 @@ public class DungeonInstance {
 
     public void addBossInstance(String bossId, BossInstance boss) {
         activeBosses.put(bossId, boss);
-        state = DungeonState.BOSS_FIGHT;
+        // Only switch to BOSS_FIGHT for required bosses — optional bosses don't block waves
+        var bossConfig = config.bosses.stream().filter(b -> b.id.equals(bossId)).findFirst().orElse(null);
+        if (bossConfig == null || bossConfig.requiredKill) {
+            state = DungeonState.BOSS_FIGHT;
+        }
     }
 
     public void removeBossInstance(String bossId) {
