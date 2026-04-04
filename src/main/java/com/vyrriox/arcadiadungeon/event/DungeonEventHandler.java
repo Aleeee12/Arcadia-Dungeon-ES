@@ -183,6 +183,9 @@ public class DungeonEventHandler {
                 if (boss.isTransitioning()) { event.setCanceled(true); return; }
                 if (boss.requiresKillSummons()) { event.setCanceled(true); boss.sendSummonWarning(instance.getPlayers()); return; }
 
+                // Reveal boss bar on first hit (optional bosses)
+                boss.revealBossBar();
+
                 // Anti-phase-skip
                 float currentHp = boss.getBossEntity().getHealth();
                 float maxHp = boss.getBossEntity().getMaxHealth();

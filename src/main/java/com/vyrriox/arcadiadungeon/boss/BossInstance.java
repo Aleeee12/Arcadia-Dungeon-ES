@@ -40,6 +40,7 @@ public class BossInstance {
     private double originalBaseSpeed;
     private long lastSummonMessageTick = 0;
     private int spawnInvulnerabilityTicks = 100; // 5 seconds of invulnerability after spawn
+    private boolean bossBarRevealed = false;
 
     public BossInstance(BossConfig config, ServerLevel level, int playerCount) {
         this.config = config;
@@ -126,7 +127,14 @@ public class BossInstance {
                     color,
                     BossEvent.BossBarOverlay.PROGRESS
             );
-            bossBar.setVisible(true);
+            // Optional bosses: hide boss bar until first hit
+            if (config.optional) {
+                bossBar.setVisible(false);
+                bossBarRevealed = false;
+            } else {
+                bossBar.setVisible(true);
+                bossBarRevealed = true;
+            }
         }
 
         if (!config.phases.isEmpty()) {
@@ -359,6 +367,13 @@ public class BossInstance {
             return "KILL_SUMMONS".equals(phase.requiredAction) && areSummonsAlive();
         }
         return false;
+    }
+
+    public void revealBossBar() {
+        if (!bossBarRevealed && bossBar != null) {
+            bossBarRevealed = true;
+            bossBar.setVisible(true);
+        }
     }
 
     public void removePlayerFromBossBar(ServerPlayer player) {
