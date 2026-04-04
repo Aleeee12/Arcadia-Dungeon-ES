@@ -13,6 +13,10 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.server.permission.PermissionAPI;
+import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
+import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
+import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 import org.slf4j.Logger;
 
 @Mod(ArcadiaDungeon.MODID)
@@ -20,14 +24,26 @@ public class ArcadiaDungeon {
     public static final String MODID = "arcadia_dungeon";
     public static final Logger LOGGER = LogUtils.getLogger();
 
+    // Permission node for bypassing anti-parasite system (compatible LuckPerms)
+    public static final PermissionNode<Boolean> BYPASS_ANTIPARASITE = new PermissionNode<>(
+            MODID, "bypass.antiparasite",
+            PermissionTypes.BOOLEAN,
+            (player, uuid, ctx) -> false // default: no bypass
+    );
+
     public ArcadiaDungeon(IEventBus modEventBus) {
         modEventBus.addListener(this::onCommonSetup);
+        modEventBus.addListener(this::onPermissionGather);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new DungeonEventHandler());
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("Arcadia Dungeon initializing...");
+    }
+
+    private void onPermissionGather(PermissionGatherEvent.Nodes event) {
+        event.addNodes(BYPASS_ANTIPARASITE);
     }
 
     @SubscribeEvent

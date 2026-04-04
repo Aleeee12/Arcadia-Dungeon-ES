@@ -517,6 +517,9 @@ public class DungeonEventHandler {
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 if (dungeonPlayers.contains(player.getUUID())) continue;
                 if (player.isSpectator()) continue;
+                // Bypass: OP or arcadia_dungeon.bypass.antiparasite permission (LuckPerms compatible)
+                if (player.hasPermissions(2)) continue;
+                try { if (net.neoforged.neoforge.server.permission.PermissionAPI.getPermission(player, ArcadiaDungeon.BYPASS_ANTIPARASITE)) continue; } catch (Exception ignored) {}
                 String dim = player.level().dimension().location().toString();
                 if (config.isInArea(dim, player.getX(), player.getY(), player.getZ())) {
                     net.minecraft.server.level.ServerLevel overworld = server.overworld();

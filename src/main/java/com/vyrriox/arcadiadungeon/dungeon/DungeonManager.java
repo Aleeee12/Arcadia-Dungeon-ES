@@ -624,10 +624,12 @@ public class DungeonManager {
         // Kick parasite players
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (dungeonPlayers.contains(player.getUUID())) continue;
+            if (player.isSpectator() || player.hasPermissions(2)) continue;
+            try { if (net.neoforged.neoforge.server.permission.PermissionAPI.getPermission(player, ArcadiaDungeon.BYPASS_ANTIPARASITE)) continue; } catch (Exception ignored) {}
 
             String playerDim = player.level().dimension().location().toString();
             if (config.isInArea(playerDim, player.getX(), player.getY(), player.getZ())) {
-                net.minecraft.server.level.ServerLevel overworld = server.overworld();
+                ServerLevel overworld = server.overworld();
                 net.minecraft.core.BlockPos spawnPos = overworld.getSharedSpawnPos();
                 player.teleportTo(overworld, spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5, 0, 0);
                 player.sendSystemMessage(Component.literal("[Arcadia] Un donjon demarre dans cette zone! Vous avez ete teleporte au spawn.")
