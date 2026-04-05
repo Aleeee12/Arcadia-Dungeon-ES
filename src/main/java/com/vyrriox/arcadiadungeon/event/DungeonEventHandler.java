@@ -91,6 +91,25 @@ public class DungeonEventHandler {
         wandPos2.remove(player.getUUID());
     }
 
+    // === CHARM/EXTERNAL EFFECT BLOCKING ===
+    @SubscribeEvent
+    public void onEffectApplied(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        DungeonInstance instance = DungeonManager.getInstance().getPlayerDungeon(player.getUUID());
+        if (instance == null) return;
+
+        // Allow effects applied by the dungeon (phase effects have showParticles=true, ambient=false)
+        var effectInstance = event.getEffectInstance();
+        if (effectInstance == null) return;
+
+        // Block beneficial effects from external sources (Apotheosis charms, beacons, etc.)
+        // Dungeon-applied effects have ambient=false and showParticles=true (set in transitionToPhase)
+        // External effects (charms) are typically ambient=true
+        if (effectInstance.isAmbient() && effectInstance.getEffect().value().isBeneficial()) {
+            event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+        }
+    }
+
     // === COMMAND BLOCKING ===
     @SubscribeEvent
     public void onCommand(CommandEvent event) {

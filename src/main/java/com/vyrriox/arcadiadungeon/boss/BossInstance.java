@@ -82,7 +82,7 @@ public class BossInstance {
         bossEntity.setPos(config.spawnPoint.x, config.spawnPoint.y, config.spawnPoint.z);
 
         if (config.customName != null && !config.customName.isEmpty()) {
-            bossEntity.setCustomName(Component.literal(config.customName));
+            bossEntity.setCustomName(DungeonManager.parseColorCodes(config.customName));
             bossEntity.setCustomNameVisible(true);
         }
 
@@ -123,7 +123,7 @@ public class BossInstance {
         if (config.showBossBar) {
             BossEvent.BossBarColor color = getBossBarColor(config.bossBarColor);
             bossBar = new ServerBossEvent(
-                    Component.literal(config.customName != null ? config.customName : "Boss"),
+                    DungeonManager.parseColorCodes(config.customName != null ? config.customName : "Boss"),
                     color,
                     BossEvent.BossBarOverlay.PROGRESS
             );
@@ -197,12 +197,16 @@ public class BossInstance {
 
         float healthPercent = bossEntity.getHealth() / bossEntity.getMaxHealth();
 
+        // Find the LOWEST phase we should be at (skip intermediate phases if HP dropped fast)
+        int targetPhase = -1;
         for (int i = currentPhase + 1; i < config.phases.size(); i++) {
-            PhaseConfig phase = config.phases.get(i);
-            if (healthPercent <= phase.healthThreshold) {
-                transitionToPhase(i, dungeonPlayers);
-                break;
+            if (healthPercent <= config.phases.get(i).healthThreshold) {
+                targetPhase = i;
             }
+        }
+
+        if (targetPhase >= 0) {
+            transitionToPhase(targetPhase, dungeonPlayers);
         }
     }
 

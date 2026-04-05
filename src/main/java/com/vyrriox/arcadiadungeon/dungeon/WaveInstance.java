@@ -7,7 +7,6 @@ import com.vyrriox.arcadiadungeon.config.MobSpawnConfig;
 import com.vyrriox.arcadiadungeon.config.SpawnPointConfig;
 import com.vyrriox.arcadiadungeon.config.WaveConfig;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -74,7 +73,12 @@ public class WaveInstance {
             ServerLevel level = server.getLevel(dimKey);
             if (level == null) continue;
 
-            for (int i = 0; i < mobConfig.count; i++) {
+            // Scale mob count based on player count
+            double countScale = adaptive ? 1.0 + (settings.waveCountMultiplierPerPlayer * (playerCount - 1)) : 1.0;
+            int scaledCount = (int) Math.round(mobConfig.count * countScale);
+            if (scaledCount < mobConfig.count) scaledCount = mobConfig.count; // never less than base
+
+            for (int i = 0; i < scaledCount; i++) {
                 Entity entity;
                 try {
                     entity = typeOpt.get().create(level);
@@ -100,7 +104,7 @@ public class WaveInstance {
 
                 // Custom name
                 if (mobConfig.customName != null && !mobConfig.customName.isEmpty()) {
-                    living.setCustomName(Component.literal(mobConfig.customName));
+                    living.setCustomName(DungeonManager.parseColorCodes(mobConfig.customName));
                     living.setCustomNameVisible(true);
                 }
 

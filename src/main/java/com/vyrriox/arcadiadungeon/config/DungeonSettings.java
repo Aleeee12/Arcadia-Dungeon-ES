@@ -11,6 +11,7 @@ public class DungeonSettings {
     public boolean difficultyScaling = true;
     public double waveHealthMultiplierPerPlayer = 0.3;
     public double waveDamageMultiplierPerPlayer = 0.1;
+    public double waveCountMultiplierPerPlayer = 0.2; // +20% mobs per extra player
     public int maxDeaths = 3;
     public boolean antiMonopole = true;
     public int antiMonopoleThreshold = 5;

@@ -244,6 +244,11 @@ public class ArcadiaCommands {
                                                 .executes(ctx -> setSettingDouble(ctx, "wavedamagemultiplier"))
                                         )
                                 )
+                                .then(Commands.literal("wavecountmultiplier")
+                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0))
+                                                .executes(ctx -> setSettingDouble(ctx, "wavecountmultiplier"))
+                                        )
+                                )
                                 .then(Commands.literal("difficultyscaling")
                                         .then(Commands.argument("value", BoolArgumentType.bool())
                                                 .executes(ctx -> setSetting(ctx, "difficultyscaling"))
@@ -1409,6 +1414,7 @@ public class ArcadiaCommands {
         switch (setting) {
             case "wavehealthmultiplier" -> config.settings.waveHealthMultiplierPerPlayer = value;
             case "wavedamagemultiplier" -> config.settings.waveDamageMultiplierPerPlayer = value;
+            case "wavecountmultiplier" -> config.settings.waveCountMultiplierPerPlayer = value;
         }
 
         ConfigManager.getInstance().saveDungeon(config);
