@@ -106,6 +106,7 @@ public class ConfigManager {
         if (config.bosses == null) config.bosses = new java.util.ArrayList<>();
         if (config.waves == null) config.waves = new java.util.ArrayList<>();
         if (config.completionRewards == null) config.completionRewards = new java.util.ArrayList<>();
+        if (config.scriptedWalls == null) config.scriptedWalls = new java.util.ArrayList<>();
         for (BossConfig boss : config.bosses) {
             if (boss.spawnPoint == null) boss.spawnPoint = new SpawnPointConfig();
             if (boss.phases == null) boss.phases = new java.util.ArrayList<>();

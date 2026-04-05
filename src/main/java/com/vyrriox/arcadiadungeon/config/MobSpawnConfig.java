@@ -11,6 +11,8 @@ public class MobSpawnConfig {
     public double damage = 3;
     public double speed = 0;
     public SpawnPointConfig spawnPoint = new SpawnPointConfig();
+    public DungeonConfig.AreaPos areaPos1 = null;
+    public DungeonConfig.AreaPos areaPos2 = null;
 
     // Equipment (item IDs, empty = no equipment)
     public String mainHand = "";
@@ -29,5 +31,13 @@ public class MobSpawnConfig {
         this.entityType = entityType;
         this.count = count;
         this.spawnPoint = spawnPoint;
+    }
+
+    public boolean hasArea() {
+        return areaPos1 != null && areaPos2 != null;
+    }
+
+    public boolean isInArea(String dimension, double px, double py, double pz) {
+        return DungeonConfig.isInsideArea(areaPos1, areaPos2, dimension, px, py, pz);
     }
 }

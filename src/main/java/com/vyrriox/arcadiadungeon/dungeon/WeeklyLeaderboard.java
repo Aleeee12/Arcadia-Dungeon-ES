@@ -27,6 +27,7 @@ public class WeeklyLeaderboard {
     private final Path dataFile;
     private WeeklyData data = new WeeklyData();
     private boolean announcedThisWeek = false;
+    private volatile boolean dirty = false;
 
     public static class WeeklyData {
         public String weekId = "";
@@ -101,6 +102,7 @@ public class WeeklyLeaderboard {
         try {
             Files.createDirectories(dataFile.getParent());
             Files.writeString(dataFile, GSON.toJson(data));
+            dirty = false;
         } catch (IOException e) {
             ArcadiaDungeon.LOGGER.error("Failed to save weekly leaderboard", e);
         }
@@ -109,7 +111,7 @@ public class WeeklyLeaderboard {
     public void recordCompletion(String uuid, String playerName) {
         data.playerCompletions.merge(uuid, 1, Integer::sum);
         data.playerNames.put(uuid, playerName);
-        save();
+        dirty = true;
     }
 
     public void tick(MinecraftServer server) {
@@ -127,7 +129,7 @@ public class WeeklyLeaderboard {
             data = new WeeklyData();
             data.weekId = currentWeek;
             announcedThisWeek = false;
-            save();
+            dirty = true;
             return;
         }
 
@@ -137,6 +139,9 @@ public class WeeklyLeaderboard {
                 announceAndReward(server);
                 announcedThisWeek = true;
             }
+        }
+        if (dirty) {
+            save();
         }
     }
 
@@ -211,7 +216,7 @@ public class WeeklyLeaderboard {
         }
 
         data.rewarded = true;
-        save();
+        dirty = true;
         ArcadiaDungeon.LOGGER.info("Weekly leaderboard rewards distributed");
     }
 
@@ -264,6 +269,7 @@ public class WeeklyLeaderboard {
         }
         data = new WeeklyData();
         data.weekId = getCurrentWeekId();
+        dirty = true;
         save();
     }
 

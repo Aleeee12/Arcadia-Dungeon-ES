@@ -15,6 +15,8 @@ public class BossConfig {
     public double healthMultiplierPerPlayer = 0.5;
     public double damageMultiplierPerPlayer = 0.1;
     public SpawnPointConfig spawnPoint = new SpawnPointConfig();
+    public DungeonConfig.AreaPos areaPos1 = null;
+    public DungeonConfig.AreaPos areaPos2 = null;
     public List<PhaseConfig> phases = new ArrayList<>();
     public List<RewardConfig> rewards = new ArrayList<>();
     public boolean showBossBar = true;
@@ -45,5 +47,13 @@ public class BossConfig {
         this.entityType = entityType;
         this.baseHealth = baseHealth;
         this.baseDamage = baseDamage;
+    }
+
+    public boolean hasArea() {
+        return areaPos1 != null && areaPos2 != null;
+    }
+
+    public boolean isInArea(String dimension, double px, double py, double pz) {
+        return DungeonConfig.isInsideArea(areaPos1, areaPos2, dimension, px, py, pz);
     }
 }

@@ -33,6 +33,7 @@ public class DungeonConfig {
     // Dungeon area (cuboid) - containment + anti-parasites
     public AreaPos areaPos1 = null;
     public AreaPos areaPos2 = null;
+    public List<ScriptedWallConfig> scriptedWalls = new ArrayList<>();
 
     public static class AreaPos {
         public String dimension = "minecraft:overworld";
@@ -54,8 +55,20 @@ public class DungeonConfig {
         return areaPos1 != null && areaPos2 != null;
     }
 
+    public static class ScriptedWallConfig {
+        public String id = "";
+        public List<AreaPos> blocks = new ArrayList<>();
+        // TODO: condition system for activating/deactivating scripted walls.
+        public String activationCondition = "";
+        public String action = "TOGGLE";
+    }
+
     public boolean isInArea(String dimension, double px, double py, double pz) {
-        if (!hasArea()) return false;
+        return isInsideArea(areaPos1, areaPos2, dimension, px, py, pz);
+    }
+
+    public static boolean isInsideArea(AreaPos areaPos1, AreaPos areaPos2, String dimension, double px, double py, double pz) {
+        if (areaPos1 == null || areaPos2 == null) return false;
         if (!areaPos1.dimension.equals(dimension)) return false;
 
         int minX = Math.min(areaPos1.x, areaPos2.x);
@@ -68,6 +81,24 @@ public class DungeonConfig {
         return px >= minX && px <= maxX + 1
                 && py >= minY && py <= maxY + 1
                 && pz >= minZ && pz <= maxZ + 1;
+    }
+
+    public static double clampInsideX(AreaPos areaPos1, AreaPos areaPos2, double x) {
+        int minX = Math.min(areaPos1.x, areaPos2.x);
+        int maxX = Math.max(areaPos1.x, areaPos2.x);
+        return Math.max(minX + 0.5, Math.min(maxX + 0.5, x));
+    }
+
+    public static double clampInsideY(AreaPos areaPos1, AreaPos areaPos2, double y) {
+        int minY = Math.min(areaPos1.y, areaPos2.y);
+        int maxY = Math.max(areaPos1.y, areaPos2.y);
+        return Math.max(minY, Math.min(maxY, y));
+    }
+
+    public static double clampInsideZ(AreaPos areaPos1, AreaPos areaPos2, double z) {
+        int minZ = Math.min(areaPos1.z, areaPos2.z);
+        int maxZ = Math.max(areaPos1.z, areaPos2.z);
+        return Math.max(minZ + 0.5, Math.min(maxZ + 0.5, z));
     }
 
     public DungeonConfig() {}

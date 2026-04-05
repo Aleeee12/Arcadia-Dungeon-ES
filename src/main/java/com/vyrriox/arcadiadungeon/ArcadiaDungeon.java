@@ -13,7 +13,6 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
 import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
@@ -31,6 +30,12 @@ public class ArcadiaDungeon {
             (player, uuid, ctx) -> false // default: no bypass
     );
 
+    public static final PermissionNode<Boolean> BYPASS_ANTIFLY = new PermissionNode<>(
+            MODID, "bypass.antifly",
+            PermissionTypes.BOOLEAN,
+            (player, uuid, ctx) -> false
+    );
+
     public ArcadiaDungeon(IEventBus modEventBus) {
         modEventBus.addListener(this::onCommonSetup);
         NeoForge.EVENT_BUS.register(this);
@@ -44,6 +49,7 @@ public class ArcadiaDungeon {
     @SubscribeEvent
     public void onPermissionGather(PermissionGatherEvent.Nodes event) {
         event.addNodes(BYPASS_ANTIPARASITE);
+        event.addNodes(BYPASS_ANTIFLY);
     }
 
     @SubscribeEvent

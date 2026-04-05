@@ -3,6 +3,10 @@ package com.vyrriox.arcadiadungeon.event;
 import com.vyrriox.arcadiadungeon.ArcadiaDungeon;
 import com.vyrriox.arcadiadungeon.boss.BossInstance;
 import com.vyrriox.arcadiadungeon.boss.BossManager;
+import com.vyrriox.arcadiadungeon.config.ConfigManager;
+import com.vyrriox.arcadiadungeon.config.DungeonConfig;
+import com.vyrriox.arcadiadungeon.config.MobSpawnConfig;
+import com.vyrriox.arcadiadungeon.config.WaveConfig;
 import com.vyrriox.arcadiadungeon.config.PhaseConfig;
 import com.vyrriox.arcadiadungeon.dungeon.*;
 import net.minecraft.ChatFormatting;
@@ -11,15 +15,20 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Vex;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.CommandEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -27,68 +36,134 @@ import java.util.*;
 
 public class DungeonEventHandler {
 
-    private long tickCounter = 0; // Fix #24: long instead of int (no overflow)
     private final Set<Integer> announcedRecruitmentMilestones = new HashSet<>(); // Fix #9: track milestones
     private final Set<Integer> announcedTimerMilestones = new HashSet<>();
+    private long nextWaveCheckAt = 0L;
+    private long nextRecruitmentCheckAt = 0L;
+    private long nextDungeonTimerCheckAt = 0L;
+    private long nextRestrictedEffectsCheckAt = 0L;
+    private long nextAntiFlyCheckAt = 0L;
+    private long nextContainmentCheckAt = 0L;
+    private long nextRecruitFreezeAt = 0L;
+    private long nextAvailabilityCheckAt = 0L;
+    private long nextProgressFlushAt = 0L;
+    private long nextWeeklyTickAt = 0L;
+    private long nextPruneAt = 0L;
+    private long nextManagedCombatCheckAt = 0L;
 
     // Wand: track selected dungeon per player
     public static final Map<UUID, String> wandDungeon = new java.util.concurrent.ConcurrentHashMap<>();
     public static final Map<UUID, net.minecraft.core.BlockPos> wandPos1 = new java.util.concurrent.ConcurrentHashMap<>();
     public static final Map<UUID, net.minecraft.core.BlockPos> wandPos2 = new java.util.concurrent.ConcurrentHashMap<>();
+    public static final Map<UUID, String> wandWall = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public static final String WAND_TAG = "arcadia_wand";
+    public static final String AREA_WAND_TAG = "arcadia_area_wand";
+    public static final String WALL_WAND_TAG = "arcadia_wall_wand";
 
     @SubscribeEvent
     public void onPlayerInteract(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!player.getMainHandItem().getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.empty()).getString().contains(WAND_TAG)) return;
-
-        String dungeonId = wandDungeon.get(player.getUUID());
-        if (dungeonId == null) { player.sendSystemMessage(Component.literal("[Arcadia] Aucun donjon selectionne! Utilisez /arcadia_dungeon admin wand d'abord.").withStyle(ChatFormatting.RED)); return; }
+        String toolTag = getToolTag(player);
+        if (toolTag == null) return;
+        if (!ensureWandSelection(player, toolTag)) return;
 
         net.minecraft.core.BlockPos pos = event.getPos();
-        wandPos1.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("[Arcadia Wand] Pos1 definie: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.GREEN));
-        trySaveWandArea(player, dungeonId);
+        if (WALL_WAND_TAG.equals(toolTag)) {
+            toggleScriptedWallBlock(player, pos);
+        } else {
+            wandPos1.put(player.getUUID(), pos);
+            player.sendSystemMessage(Component.literal("[Arcadia Wand] Pos1 definie: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.GREEN));
+            trySaveWandArea(player);
+        }
         event.setCanceled(true);
     }
 
     @SubscribeEvent
     public void onPlayerInteractRight(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!player.getMainHandItem().getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.empty()).getString().contains(WAND_TAG)) return;
-
-        String dungeonId = wandDungeon.get(player.getUUID());
-        if (dungeonId == null) { player.sendSystemMessage(Component.literal("[Arcadia] Aucun donjon selectionne!").withStyle(ChatFormatting.RED)); return; }
+        String toolTag = getToolTag(player);
+        if (toolTag == null) return;
+        if (!ensureWandSelection(player, toolTag)) return;
 
         net.minecraft.core.BlockPos pos = event.getPos();
-        wandPos2.put(player.getUUID(), pos);
-        player.sendSystemMessage(Component.literal("[Arcadia Wand] Pos2 definie: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.AQUA));
-        trySaveWandArea(player, dungeonId);
+        if (WALL_WAND_TAG.equals(toolTag)) {
+            toggleScriptedWallBlock(player, pos);
+        } else {
+            wandPos2.put(player.getUUID(), pos);
+            player.sendSystemMessage(Component.literal("[Arcadia Wand] Pos2 definie: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.AQUA));
+            trySaveWandArea(player);
+        }
         event.setCanceled(true);
     }
 
-    private void trySaveWandArea(ServerPlayer player, String dungeonId) {
+    private String getToolTag(ServerPlayer player) {
+        String name = player.getMainHandItem().getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.empty()).getString();
+        if (name.contains(AREA_WAND_TAG)) return AREA_WAND_TAG;
+        if (name.contains(WALL_WAND_TAG)) return WALL_WAND_TAG;
+        return null;
+    }
+
+    private boolean ensureWandSelection(ServerPlayer player, String toolTag) {
+        if (!wandDungeon.containsKey(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Arcadia] Aucun donjon selectionne pour cet outil.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+        if (WALL_WAND_TAG.equals(toolTag) && !wandWall.containsKey(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Arcadia] Selectionnez un mur scripté avec /arcadia_dungeon admin wall_select <dungeon> <wallId>.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+        return true;
+    }
+
+    private void trySaveWandArea(ServerPlayer player) {
         net.minecraft.core.BlockPos p1 = wandPos1.get(player.getUUID());
         net.minecraft.core.BlockPos p2 = wandPos2.get(player.getUUID());
         if (p1 == null || p2 == null) return;
 
-        var config = com.vyrriox.arcadiadungeon.config.ConfigManager.getInstance().getDungeon(dungeonId);
+        String dungeonId = wandDungeon.get(player.getUUID());
+        var config = ConfigManager.getInstance().getDungeon(dungeonId);
         if (config == null) return;
 
         String dim = player.level().dimension().location().toString();
-        config.areaPos1 = new com.vyrriox.arcadiadungeon.config.DungeonConfig.AreaPos(dim, p1.getX(), p1.getY(), p1.getZ());
-        config.areaPos2 = new com.vyrriox.arcadiadungeon.config.DungeonConfig.AreaPos(dim, p2.getX(), p2.getY(), p2.getZ());
-        com.vyrriox.arcadiadungeon.config.ConfigManager.getInstance().saveDungeon(config);
+        DungeonConfig.AreaPos pos1 = new DungeonConfig.AreaPos(dim, p1.getX(), p1.getY(), p1.getZ());
+        DungeonConfig.AreaPos pos2 = new DungeonConfig.AreaPos(dim, p2.getX(), p2.getY(), p2.getZ());
+
+        config.areaPos1 = pos1;
+        config.areaPos2 = pos2;
+        String label = config.name;
+        ConfigManager.getInstance().saveDungeon(config);
 
         int sx = Math.abs(p2.getX() - p1.getX()) + 1;
         int sy = Math.abs(p2.getY() - p1.getY()) + 1;
         int sz = Math.abs(p2.getZ() - p1.getZ()) + 1;
-        player.sendSystemMessage(Component.literal("[Arcadia Wand] Zone sauvegardee pour " + config.name + "! " + sx + "x" + sy + "x" + sz + " (" + (sx*sy*sz) + " blocs)")
+        player.sendSystemMessage(Component.literal("[Arcadia Wand] Zone sauvegardee pour " + label + "! " + sx + "x" + sy + "x" + sz + " (" + (sx*sy*sz) + " blocs)")
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
 
         wandPos1.remove(player.getUUID());
         wandPos2.remove(player.getUUID());
+    }
+
+    private void toggleScriptedWallBlock(ServerPlayer player, net.minecraft.core.BlockPos pos) {
+        String dungeonId = wandDungeon.get(player.getUUID());
+        String wallId = wandWall.get(player.getUUID());
+        if (dungeonId == null || wallId == null) return;
+
+        var config = ConfigManager.getInstance().getDungeon(dungeonId);
+        if (config == null) return;
+
+        var wall = config.scriptedWalls.stream().filter(w -> w.id.equals(wallId)).findFirst().orElse(null);
+        if (wall == null) return;
+
+        String dim = player.level().dimension().location().toString();
+        var existing = wall.blocks.stream().filter(b -> b.dimension.equals(dim) && b.x == pos.getX() && b.y == pos.getY() && b.z == pos.getZ()).findFirst().orElse(null);
+        if (existing != null) {
+            wall.blocks.remove(existing);
+            player.sendSystemMessage(Component.literal("[Arcadia Wall] Bloc retire: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.YELLOW));
+        } else {
+            wall.blocks.add(new DungeonConfig.AreaPos(dim, pos.getX(), pos.getY(), pos.getZ()));
+            player.sendSystemMessage(Component.literal("[Arcadia Wall] Bloc ajoute: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.GREEN));
+        }
+        ConfigManager.getInstance().saveDungeon(config);
     }
 
     // === CHARM/EXTERNAL EFFECT BLOCKING ===
@@ -98,15 +173,60 @@ public class DungeonEventHandler {
         DungeonInstance instance = DungeonManager.getInstance().getPlayerDungeon(player.getUUID());
         if (instance == null) return;
 
-        // Allow effects applied by the dungeon (phase effects have showParticles=true, ambient=false)
         var effectInstance = event.getEffectInstance();
         if (effectInstance == null) return;
 
-        // Block beneficial effects from external sources (Apotheosis charms, beacons, etc.)
-        // Dungeon-applied effects have ambient=false and showParticles=true (set in transitionToPhase)
-        // External effects (charms) are typically ambient=true
-        if (effectInstance.isAmbient() && effectInstance.getEffect().value().isBeneficial()) {
+        if (effectInstance.getEffect().value().isBeneficial()
+                && !DungeonManager.getInstance().isBeneficialEffectAllowed(player, effectInstance)) {
             event.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+        }
+    }
+
+    @SubscribeEvent
+    public void onItemUseFinish(LivingEntityUseItemEvent.Finish event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (DungeonManager.getInstance().getPlayerDungeon(player.getUUID()) == null) return;
+
+        var item = event.getItem().getItem();
+        if (item == net.minecraft.world.item.Items.GOLDEN_APPLE) {
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.REGENERATION, 1, 100);
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.ABSORPTION, 0, 2400);
+        } else if (item == net.minecraft.world.item.Items.ENCHANTED_GOLDEN_APPLE) {
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.REGENERATION, 1, 400);
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.ABSORPTION, 3, 2400);
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.DAMAGE_RESISTANCE, 0, 6000);
+            DungeonManager.getInstance().allowBeneficialEffect(player, net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 0, 6000);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        long now = System.currentTimeMillis();
+        Entity entity = event.getEntity();
+        if (entity instanceof Player) return;
+
+        if (entity instanceof Projectile projectile && CombatTuning.shouldCancelProjectileSpawn(projectile, now)) {
+            event.setCanceled(true);
+            return;
+        }
+
+        if (entity instanceof Vex vex && isArcadiaManaged(vex.getOwner())) {
+            event.setCanceled(true);
+            return;
+        }
+
+        if (!(entity instanceof LivingEntity living)) return;
+        if (isArcadiaManaged(living)) return;
+
+        for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
+            var config = instance.getConfig();
+            if (!config.hasArea()) continue;
+            String dimension = living.level().dimension().location().toString();
+            if (!config.isInArea(dimension, living.getX(), living.getY(), living.getZ())) continue;
+
+            event.setCanceled(true);
+            ArcadiaDungeon.LOGGER.debug("Blocked unmanaged entity {} inside active dungeon {}", entity.getType(), config.id);
+            return;
         }
     }
 
@@ -135,34 +255,58 @@ public class DungeonEventHandler {
     // === TICK ===
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
-        tickCounter++;
+        long now = System.currentTimeMillis();
         DungeonManager.getInstance().processPendingFails();
         BossManager.getInstance().tickAllBosses(); // Fix #19: early-exit is inside BossManager now
 
-        if (tickCounter % 10 == 0) checkWaveStates();
-        if (tickCounter % 20 == 0) { checkRecruitment(); checkDungeonTimers(); }
-        if (tickCounter % 40 == 0) { checkContainment(); checkPlayerContainment(); }
-
-        // Fix #18: apply freeze effects less frequently (every 100 ticks = 5s, with longer duration)
-        if (tickCounter % 100 == 0) freezeRecruitingPlayers();
-
-        // Check availability announcements every 10s
-        if (tickCounter % 200 == 0) DungeonManager.getInstance().checkAvailabilityAnnouncements();
-
-        // Weekly leaderboard tick every minute
-        // Fix #8: flush dirty player data every 30s instead of on every completion
-        if (tickCounter % 600 == 0) {
+        if (now >= nextWaveCheckAt) {
+            nextWaveCheckAt = now + 500L;
+            checkWaveStates();
+        }
+        if (now >= nextRecruitmentCheckAt) {
+            nextRecruitmentCheckAt = now + 1000L;
+            checkRecruitment();
+        }
+        if (now >= nextDungeonTimerCheckAt) {
+            nextDungeonTimerCheckAt = now + 1000L;
+            checkDungeonTimers();
+        }
+        if (now >= nextRestrictedEffectsCheckAt) {
+            nextRestrictedEffectsCheckAt = now + 5000L;
+            checkRestrictedEffects();
+        }
+        if (now >= nextAntiFlyCheckAt) {
+            nextAntiFlyCheckAt = now + 2000L;
+            checkAntiFly();
+        }
+        if (now >= nextContainmentCheckAt) {
+            nextContainmentCheckAt = now + 5000L;
+            checkPlayerContainment();
+        }
+        if (now >= nextRecruitFreezeAt) {
+            nextRecruitFreezeAt = now + 5000L;
+            freezeRecruitingPlayers();
+        }
+        if (now >= nextAvailabilityCheckAt) {
+            nextAvailabilityCheckAt = now + 10000L;
+            DungeonManager.getInstance().checkAvailabilityAnnouncements();
+        }
+        if (now >= nextProgressFlushAt) {
+            nextProgressFlushAt = now + 30000L;
             PlayerProgressManager.getInstance().flushDirty();
         }
-
-        if (tickCounter % 1200 == 0) {
+        if (now >= nextWeeklyTickAt) {
+            nextWeeklyTickAt = now + 60000L;
             var server = DungeonManager.getInstance().getServer();
             if (server != null) WeeklyLeaderboard.getInstance().tick(server);
         }
-
-        // Prune expired data every 5 minutes to prevent memory leaks
-        if (tickCounter % 6000 == 0) {
+        if (now >= nextPruneAt) {
+            nextPruneAt = now + 300000L;
             DungeonManager.getInstance().pruneExpiredData();
+        }
+        if (now >= nextManagedCombatCheckAt) {
+            nextManagedCombatCheckAt = now + 100L;
+            checkManagedCombat(now);
         }
     }
 
@@ -178,6 +322,7 @@ public class DungeonEventHandler {
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onEntityDamage(LivingIncomingDamageEvent event) {
         LivingEntity entity = event.getEntity();
+        long now = System.currentTimeMillis();
 
         // Anti-PVP
         if (entity instanceof ServerPlayer targetPlayer) {
@@ -192,6 +337,18 @@ public class DungeonEventHandler {
             }
         }
 
+        if (entity.getTags().contains("arcadia_managed") && CombatTuning.shouldDodge(entity, event.getSource().getDirectEntity(), now)) {
+            event.setCanceled(true);
+            return;
+        }
+
+        if (event.getSource().getEntity() instanceof LivingEntity attacker
+                && attacker.getTags().contains("arcadia_managed")
+                && CombatTuning.shouldCancelDirectMeleeForCooldown(attacker, event.getSource().getDirectEntity(), now)) {
+            event.setCanceled(true);
+            return;
+        }
+
         if (!entity.getTags().contains("arcadia_boss")) return;
 
         // Fix #7: direct lookup instead of O(D*B) scan
@@ -200,7 +357,11 @@ public class DungeonEventHandler {
                 if (boss.getBossEntity() != entity) continue;
 
                 if (boss.isTransitioning()) { event.setCanceled(true); return; }
-                if (boss.requiresKillSummons()) { event.setCanceled(true); boss.sendSummonWarning(instance.getPlayers()); return; }
+                if (boss.shouldBlockDamageWhileSummonsAlive()) {
+                    event.setCanceled(true);
+                    boss.sendSummonWarning(instance.getPlayers());
+                    return;
+                }
 
                 // Reveal boss bar on first hit (optional bosses)
                 boss.revealBossBar();
@@ -211,8 +372,16 @@ public class DungeonEventHandler {
                 float resultHp = currentHp - event.getAmount();
                 float floor = getHealthFloorForNextPhase(boss, maxHp);
                 if (floor > 0 && resultHp < floor) {
-                    float capped = currentHp - floor;
+                    // Force the boss slightly below the threshold so the next tick can
+                    // reliably advance the phase instead of pinning health exactly on it.
+                    float targetHp = Math.max(Math.nextDown(floor), 0.5f);
+                    float capped = currentHp - targetHp;
                     if (capped > 0) event.setAmount(capped); else event.setCanceled(true);
+                    resultHp = currentHp - event.getAmount();
+                }
+
+                if (!event.isCanceled() && maxHp > 0) {
+                    boss.checkPhaseTransition(resultHp / maxHp, instance.getPlayers());
                 }
                 return;
             }
@@ -225,6 +394,30 @@ public class DungeonEventHandler {
             return (float) (phases.get(i).healthThreshold * maxHp);
         }
         return 0;
+    }
+
+    private void checkManagedCombat(long now) {
+        for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
+            for (BossInstance boss : instance.getActiveBosses().values()) {
+                LivingEntity bossEntity = boss.getBossEntity();
+                if (bossEntity != null && bossEntity.isAlive()) {
+                    CombatTuning.tryExtendedMeleeAttack(bossEntity, now);
+                }
+                for (LivingEntity summon : boss.getSummonedMobs()) {
+                    if (summon.isAlive()) {
+                        CombatTuning.tryExtendedMeleeAttack(summon, now);
+                    }
+                }
+            }
+
+            for (WaveInstance wave : instance.getWaveInstances()) {
+                for (LivingEntity mob : wave.getAliveMobs()) {
+                    if (mob.isAlive()) {
+                        CombatTuning.tryExtendedMeleeAttack(mob, now);
+                    }
+                }
+            }
+        }
     }
 
     @SubscribeEvent
@@ -285,7 +478,13 @@ public class DungeonEventHandler {
                     ServerPlayer player = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(playerId);
                     if (player != null) {
                         instance.giveRewards(player, boss.getConfig().rewards);
-                        player.sendSystemMessage(Component.literal("[Arcadia] Boss " + boss.getConfig().customName + " vaincu!").withStyle(ChatFormatting.GOLD));
+                        String bossLabel = (boss.getConfig().customName == null || boss.getConfig().customName.isEmpty())
+                                ? bossId
+                                : boss.getConfig().customName;
+                        Component bossName = DungeonManager.parseColorCodes(bossLabel);
+                        player.sendSystemMessage(Component.literal("[Arcadia] Boss ").withStyle(ChatFormatting.GOLD)
+                                .append(bossName)
+                                .append(Component.literal(" vaincu!").withStyle(ChatFormatting.GOLD)));
                     }
                 }
 
@@ -362,6 +561,24 @@ public class DungeonEventHandler {
                     // Fix #18: longer duration (120 ticks = 6s), applied every 5s
                     player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 120, 0, false, false, false));
                     player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 120, 255, false, false, false));
+                }
+            }
+        }
+    }
+
+    private void checkRestrictedEffects() {
+        MinecraftServer server = DungeonManager.getInstance().getServer();
+        if (server == null) return;
+
+        for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
+            for (UUID playerId : instance.getPlayers()) {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null) continue;
+
+                for (MobEffectInstance effect : List.copyOf(player.getActiveEffects())) {
+                    if (!effect.getEffect().value().isBeneficial()) continue;
+                    if (DungeonManager.getInstance().isBeneficialEffectAllowed(player, effect)) continue;
+                    player.removeEffect(effect.getEffect());
                 }
             }
         }
@@ -500,23 +717,6 @@ public class DungeonEventHandler {
         // else: required spawnAtStart bosses still alive — wait for them to die
     }
 
-    // === CONTAINMENT ===
-    private void checkContainment() {
-        for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
-            var config = instance.getConfig();
-            if (!config.hasArea()) continue;
-            for (WaveInstance wave : instance.getWaveInstances()) wave.checkContainmentArea(config);
-            for (BossInstance boss : instance.getActiveBosses().values()) {
-                if (boss.getBossEntity() != null && boss.getBossEntity().isAlive()) {
-                    LivingEntity be = boss.getBossEntity();
-                    if (!config.isInArea(be.level().dimension().location().toString(), be.getX(), be.getY(), be.getZ())) {
-                        be.teleportTo(boss.getConfig().spawnPoint.x, boss.getConfig().spawnPoint.y, boss.getConfig().spawnPoint.z);
-                    }
-                }
-            }
-        }
-    }
-
     private void checkPlayerContainment() {
         MinecraftServer server = DungeonManager.getInstance().getServer();
         if (server == null) return;
@@ -554,6 +754,68 @@ public class DungeonEventHandler {
         }
     }
 
+    private final Map<UUID, Boolean> suspendedFlight = new HashMap<>();
+
+    private void checkAntiFly() {
+        MinecraftServer server = DungeonManager.getInstance().getServer();
+        if (server == null) return;
+
+        Set<UUID> dungeonPlayers = new HashSet<>();
+        for (DungeonInstance instance : DungeonManager.getInstance().getActiveInstances().values()) {
+            if (instance.getState() == DungeonState.RECRUITING) continue;
+
+            for (UUID playerId : instance.getPlayers()) {
+                dungeonPlayers.add(playerId);
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null || !player.isAlive() || player.isSpectator()) continue;
+                if (player.hasPermissions(2)) continue;
+                try {
+                    if (net.neoforged.neoforge.server.permission.PermissionAPI.getPermission(player, ArcadiaDungeon.BYPASS_ANTIFLY)) {
+                        restoreFlight(player);
+                        continue;
+                    }
+                } catch (Exception ignored) {}
+
+                if (player.getAbilities().mayfly && !suspendedFlight.containsKey(playerId)) {
+                    suspendedFlight.put(playerId, true);
+                }
+
+                boolean changed = false;
+                if (player.getAbilities().flying) {
+                    player.getAbilities().flying = false;
+                    changed = true;
+                }
+                if (player.getAbilities().mayfly) {
+                    player.getAbilities().mayfly = false;
+                    changed = true;
+                }
+                if (player.isFallFlying()) {
+                    player.stopFallFlying();
+                }
+                if (changed) {
+                    player.onUpdateAbilities();
+                    player.sendSystemMessage(Component.literal("[Arcadia] Le fly est desactive dans ce donjon.").withStyle(ChatFormatting.RED));
+                }
+            }
+        }
+
+        for (UUID playerId : new ArrayList<>(suspendedFlight.keySet())) {
+            if (dungeonPlayers.contains(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) {
+                restoreFlight(player);
+            } else {
+                suspendedFlight.remove(playerId);
+            }
+        }
+    }
+
+    private void restoreFlight(ServerPlayer player) {
+        if (!Boolean.TRUE.equals(suspendedFlight.remove(player.getUUID()))) return;
+        player.getAbilities().mayfly = true;
+        player.onUpdateAbilities();
+    }
+
     // === TIMERS ===
     private void checkDungeonTimers() {
         for (Map.Entry<String, DungeonInstance> entry : new ArrayList<>(DungeonManager.getInstance().getActiveInstances().entrySet())) {
@@ -587,5 +849,9 @@ public class DungeonEventHandler {
                 }
             }
         }
+    }
+
+    private boolean isArcadiaManaged(Entity entity) {
+        return entity != null && entity.getTags().contains("arcadia_managed");
     }
 }
