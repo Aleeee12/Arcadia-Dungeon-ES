@@ -270,7 +270,7 @@ public class DungeonCombatEventHandler {
             for (UUID otherId : instance.getPlayers()) {
                 if (!otherId.equals(player.getUUID())) {
                     ServerPlayer other = DungeonManager.getInstance().getServer().getPlayerList().getPlayer(otherId);
-                    if (other != null) other.sendSystemMessage(Component.literal("[Arcadia] " + player.getName().getString() + " a ete exclu (trop de morts)!").withStyle(ChatFormatting.RED));
+                    if (other != null) other.sendSystemMessage(Component.literal("[Arcadia] " + player.getName().getString() + " ha sido excluido (demasiadas muertes)!").withStyle(ChatFormatting.RED));
                 }
             }
             DungeonManager.getInstance().schedulePlayerRemoval(player.getUUID());
