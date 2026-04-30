@@ -21,7 +21,7 @@ final class ArcadiaAdminDungeonCommandActions {
         String name = StringArgumentType.getString(ctx, "name");
 
         if (ConfigManager.getInstance().getDungeon(id) != null) {
-            ctx.getSource().sendFailure(Component.literal("[Arcadia] Un donjon avec l'id '" + id + "' existe deja!"));
+            ctx.getSource().sendFailure(Component.literal("[Arcadia] ¡Ya existe una mazmorra con el ID «« + id + »»!"));
             return 0;
         }
 
@@ -37,7 +37,7 @@ final class ArcadiaAdminDungeonCommandActions {
         }
 
         ConfigManager.getInstance().saveDungeon(config);
-        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Donjon '" + name + "' cree avec succes! (id: " + id + ")")
+        ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Mazmorra '" + name + "' crear con éxito! (id: " + id + ")")
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
@@ -45,7 +45,7 @@ final class ArcadiaAdminDungeonCommandActions {
     static int deleteDungeon(CommandContext<CommandSourceStack> ctx) {
         String id = StringArgumentType.getString(ctx, "dungeon");
         if (ConfigManager.getInstance().deleteDungeon(id)) {
-            ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Donjon '" + id + "' supprime.")
+            ctx.getSource().sendSuccess(() -> Component.literal("[Arcadia] Mazmorra '" + id + "' supprime.")
                     .withStyle(ChatFormatting.GREEN), true);
             return 1;
         }
