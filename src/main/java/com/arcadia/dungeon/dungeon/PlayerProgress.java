@@ -59,7 +59,7 @@ public class PlayerProgress {
             changed = true;
         }
         if (arcadiaProgress.arcadiaRank == null || arcadiaProgress.arcadiaRank.isBlank()) {
-            arcadiaProgress.arcadiaRank = "Novice";
+            arcadiaProgress.arcadiaRank = "Novato";
             changed = true;
         }
         if (arcadiaProgress.weeklyStreak < 0) {
