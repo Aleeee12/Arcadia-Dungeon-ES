@@ -201,7 +201,7 @@ public class DungeonTickHandler {
                     }
                     for (UUID playerId : instance.getPlayers()) {
                         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                        if (player != null) player.sendSystemMessage(Component.literal("[Donjon] Un boss approche!").withStyle(ChatFormatting.GOLD));
+                        if (player != null) player.sendSystemMessage(Component.literal("[Mazmorra] ¡Se acerca un jefe!").withStyle(ChatFormatting.GOLD));
                     }
                 } else {
                     if (!instance.advanceWave()) onWavesCompleted(instance);
